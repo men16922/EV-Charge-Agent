@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EV-Charge Agent — Smarter, Greener Charging for Communities</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --blue: #1a73e8; --blue-dark: #1557b0;
+      --green: #1e8e3e; --green-soft: #e6f4ea;
+      --amber: #f9ab00; --red: #d93025;
+      --ink: #202124; --ink-2: #5f6368; --line: #e3e6e8;
+      --bg: #f6f8f7; --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+      color: var(--ink); background: var(--bg);
+      display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+    }
+    header {
+      display: flex; align-items: center; gap: 12px; padding: 9px 20px;
+      background: var(--card); border-bottom: 1px solid var(--line);
+      box-shadow: 0 1px 2px rgba(60,64,67,.08); z-index: 1200;
+    }
+    .logo {
+      width: 38px; height: 38px; border-radius: 10px; color: #fff; font-size: 18px;
+      background: linear-gradient(135deg, #e6f4ea, #e8f0fe);
+      display: grid; place-items: center; font-weight: 700; overflow: hidden;
+    }
+    .logo img { width: 100%; height: 100%; object-fit: contain; }
+    header h1 { font-size: 17px; margin: 0; font-weight: 500; }
+    header .sub { color: var(--ink-2); font-size: 11.5px; }
+    .tag { font-size: 11px; padding: 4px 10px; border-radius: 999px;
+      background: var(--green-soft); color: var(--green); font-weight: 500; }
+    .langbtn { border: 1px solid var(--line); background: #fff; color: var(--ink);
+      border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; }
+    .langbtn:hover { background: #f1f3f4; }
+
+    /* KPI strip */
+    .kpis { display: flex; gap: 10px; padding: 10px 18px; background: var(--card);
+      border-bottom: 1px solid var(--line); overflow-x: auto; z-index: 1100; }
+    .kpi { flex: 1 1 0; min-width: 120px; border: 1px solid var(--line); border-radius: 12px;
+      padding: 8px 12px; background: linear-gradient(180deg,#fff,#fbfdfc); }
+    .kpi .v { font-size: 19px; font-weight: 700; line-height: 1.1; }
+    .kpi .l { font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+    .kpi.eco .v { color: var(--green); }
+    .kpi .hint { font-size: 9.5px; color: #9aa0a6; }
+
+    main { flex: 1; display: flex; min-height: 0; }
+    #map { flex: 1; min-width: 0; }
+    aside.side { width: 392px; background: var(--card); border-left: 1px solid var(--line);
+      display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .chat-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+
+    .panel { padding: 9px 14px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+    .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .5px;
+      color: var(--ink-2); margin: 0 0 7px; font-weight: 700;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      cursor: pointer; user-select: none; }
+    .panel h2 .chev { font-size: 11px; color: var(--ink-2); transition: transform .2s; flex: 0 0 auto; }
+    .panel.collapsed h2 { margin-bottom: 0; }
+    .panel.collapsed h2 .chev { transform: rotate(-90deg); }
+    .panel.collapsed .panel-body { display: none; }
+    .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+    .btn { border: none; border-radius: 9px; padding: 9px 13px; font-size: 13px; font-weight: 500;
+      cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary { background: var(--blue); color: #fff; } .btn-primary:hover { background: var(--blue-dark); }
+    .btn-eco { background: var(--green); color: #fff; } .btn-eco:hover { filter: brightness(.95); }
+    .btn-ghost { background: #eef1f0; color: var(--ink); } .btn-ghost:hover { background: #e3e8e6; }
+    .btn.active { outline: 2px solid var(--green); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    select { padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: #fff; }
+    label.fld { font-size: 11.5px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
+
+    .results { padding: 8px 12px; }
+    .rec-empty { color: var(--ink-2); font-size: 13px; padding: 12px; text-align: center; }
+    .rec-warn { background: #fce8e6; color: var(--red); border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-bottom: 8px; }
+    .rec { border: 1px solid var(--line); border-radius: 11px; padding: 9px 11px; margin-bottom: 8px; cursor: pointer; transition: .15s; }
+    .rec:hover { border-color: var(--blue); box-shadow: 0 1px 7px rgba(26,115,232,.16); }
+    .rec.top { border-color: var(--green); background: var(--green-soft); }
+    .rec .name { font-weight: 500; font-size: 13.5px; }
+    .rec .meta { font-size: 11.5px; color: var(--ink-2); margin-top: 2px; }
+    .why { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+    .pill { font-size: 10.5px; padding: 2px 8px; border-radius: 999px; }
+    .pill.dist { background: #e8f0fe; color: var(--blue-dark); }
+    .pill.kw { background: var(--green-soft); color: var(--green); }
+    .pill.conn { background: #fef7e0; color: #8a6d00; }
+    .pill.best { background: var(--green); color: #fff; }
+    .pill.pub { background: #e8eaed; color: #3c4043; }
+    .pill.ok { background: var(--green-soft); color: var(--green); }
+    .pill.warn { background: #fef7e0; color: #8a6d00; }
+    .pill.bad { background: #fce8e6; color: var(--red); }
+    .pill.match { background: #e8f0fe; color: var(--blue-dark); }
+    .car-marker { font-size: 26px; line-height: 1; text-align: center; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
+    .chg-pin { width: 20px; height: 20px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+      display: grid; place-items: center; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .chg-pin span { transform: rotate(45deg); font-size: 9px; line-height: 1; }
+    .chg-pin.rec { width: 30px; height: 30px; border-width: 3px; }
+    .chg-pin.rec span { font-size: 14px; font-weight: 700; color: #fff; }
+    /* sleek car popup */
+    .leaflet-popup-content { margin: 10px 12px; }
+    .car-pop { display: flex; gap: 11px; align-items: center; min-width: 178px; }
+    .car-pop-img { width: 74px; height: 46px; object-fit: contain; flex: 0 0 auto; }
+    .car-pop-body { flex: 1; min-width: 0; }
+    .car-pop-name { font-weight: 700; font-size: 13px; color: var(--ink); }
+    .car-pop-sub { font-size: 11px; color: var(--ink-2); margin: 1px 0 6px; }
+    .car-pop-batt { height: 7px; background: #e8eaed; border-radius: 999px; overflow: hidden; width: 100%; }
+    .car-pop-batt span { display: block; height: 100%; border-radius: 999px; }
+    .car-pop-stat { font-size: 11px; color: var(--ink); margin-top: 4px; font-weight: 500; }
+    .veh-img { width: 76px; height: 46px; object-fit: contain; border-radius: 8px; background: #f6f8f7; flex: 0 0 auto; }
+    .ev-card { display: flex; gap: 12px; align-items: center; margin-bottom: 9px; }
+    .veh-img-lg { width: 100px; height: 58px; object-fit: contain; border-radius: 10px; background: linear-gradient(180deg,#fff,#f1f5f3); flex: 0 0 auto; }
+    .ev-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+    .ev-stats { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ev-conn, .ev-range { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; }
+    .ev-conn { background: #e8f0fe; color: var(--blue-dark); }
+    .ev-range { background: var(--green-soft); color: var(--green); }
+    .batt-top { font-size: 12px; color: var(--ink-2); margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .batt-top b { color: var(--ink); font-size: 14px; }
+    .batt-track { height: 10px; background: #e8eaed; border-radius: 999px; overflow: hidden; }
+    .batt-fill { height: 100%; border-radius: 999px; transition: width .25s ease, background .25s; }
+    #soc { width: 100%; margin-top: 8px; accent-color: var(--green); }
+
+    /* forecast sparkline */
+    .spark { width: 100%; height: 56px; }
+    .spark-meta { font-size: 11px; color: var(--ink-2); display: flex; justify-content: space-between; }
+
+    .chat-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .chat-head { padding: 9px 16px; font-size: 12px; font-weight: 700; color: var(--ink-2);
+      text-transform: uppercase; letter-spacing: .5px; border-top: 1px solid var(--line);
+      display: flex; align-items: center; gap: 8px; }
+    .avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover;
+      box-shadow: 0 0 0 2px var(--green-soft); }
+    #chat-box { padding: 8px 14px; display: flex; flex-direction: column; gap: 8px; }
+    .message-bubble { max-width: 92%; padding: 9px 12px; border-radius: 14px; font-size: 13px; line-height: 1.5; }
+    .message-user { align-self: flex-end; background: var(--blue); color: #fff; border-bottom-right-radius: 4px; }
+    .message-agent { align-self: flex-start; background: #f1f3f4; color: var(--ink); border-bottom-left-radius: 4px; }
+    .message-agent li { margin-left: 16px; }
+    .message-agent code { background: #e8eaed; padding: 1px 4px; border-radius: 4px; font-size: 12px; }
+    #typing { display: none; align-self: flex-start; color: var(--ink-2); font-size: 12px; padding: 2px 10px; }
+    .steps { align-self: flex-start; max-width: 94%; background: var(--green-soft); border: 1px solid #cfe9d6;
+      border-radius: 12px; padding: 8px 11px; font-size: 11.5px; color: #1e6e34; }
+    .steps b { display: block; font-size: 9.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--green); margin-bottom: 4px; }
+    .steps div { padding: 1px 0; }
+    .quick { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 12px 8px; }
+    .chip { font-size: 11.5px; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 10px; cursor: pointer; color: var(--blue-dark); }
+    .chip:hover { background: #e8f0fe; }
+    .chat-input-area { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+    .chat-input { flex: 1; padding: 10px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; font-family: inherit; outline: none; }
+    .chat-input:focus { border-color: var(--blue); }
+
+    .legend { background: #fff; padding: 7px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.7; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+    .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .routebox { background:#fff; padding:6px 10px; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.2); font-size:12px; }
+    .routebox b { color: var(--blue-dark); }
+    .prov { font-size:10px; padding:1px 6px; border-radius:999px; margin-left:6px; }
+    .prov.google { background:#e8f0fe; color:#1557b0; } .prov.osrm { background:#e6f4ea; color:#1e8e3e; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo"><img src="/static/ev-agent.png" alt="EV" onerror="this.parentNode.textContent='⚡'" /></div>
+    <div>
+      <h1>EV-Charge Agent</h1>
+      <div class="sub" data-i18n="tagline">AI Decision Intelligence for Smarter, Greener Communities · APAC</div>
+    </div>
+    <div style="margin-left:auto; display:flex; align-items:center; gap:10px;">
+      <button id="lang-btn" class="langbtn" onclick="toggleLang()">한국어</button>
+      <span class="tag">Gemini · BigQuery ML · ADK · Google Maps</span>
+    </div>
+  </header>
+
+  <!-- Community impact KPIs -->
+  <div class="kpis" id="kpis">
+    <div class="kpi"><div class="v" id="k-total">—</div><div class="l" data-i18n="kpiStations">APAC stations</div></div>
+    <div class="kpi"><div class="v" id="k-public">—</div><div class="l" data-i18n="kpiPublic">Public-access %</div></div>
+    <div class="kpi"><div class="v" id="k-fast">—</div><div class="l" data-i18n="kpiFast">Fast / Ultra chargers</div></div>
+    <div class="kpi eco"><div class="v" id="k-co2">—</div><div class="l" data-i18n="kpiCo2">CO₂ avoided / yr</div><div class="hint" id="k-co2-h"></div></div>
+    <div class="kpi"><div class="v" id="k-desert">—</div><div class="l" data-i18n="kpiDesert">Charging-desert cells</div><div class="hint" data-i18n="kpiDesertHint">in current view · tap Equity</div></div>
+  </div>
+
+  <main>
+    <div id="map"></div>
+    <aside class="side">
+      <div class="panel">
+        <h2 onclick="togglePanel(this)"><span data-i18n="myev">🔋 My EV</span><span class="chev">▾</span></h2>
+        <div class="panel-body">
+          <div class="ev-card">
+            <img id="veh-img" class="veh-img-lg" alt="" onerror="this.style.visibility='hidden'" />
+            <div class="ev-info">
+              <select id="vehicle" onchange="selectVehicle(this.value)"></select>
+              <div class="ev-stats">
+                <span class="ev-conn" id="conn-chip">🔌 CCS</span>
+                <span class="ev-range">🧭 <b id="range-val">86 km</b></span>
+              </div>
+            </div>
+          </div>
+          <div class="batt">
+            <div class="batt-top"><span data-i18n="battery">Battery</span><b id="soc-val">20%</b></div>
+            <div class="batt-track"><div class="batt-fill" id="batt-fill"></div></div>
+            <input type="range" id="soc" min="5" max="100" value="20" step="5" oninput="updateEV()" />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 onclick="togglePanel(this)"><span data-i18n="findCharging">🚗 Find charging for my car</span><span class="chev">▾</span></h2>
+        <div class="panel-body">
+          <div class="row">
+            <button class="btn btn-primary" id="loc-btn" onclick="useMyLocation()" data-i18n="myCarLoc">📍 My car location</button>
+            <label class="fld" style="flex:1;"><span data-i18n="jumpCity">Jump to APAC city</span>
+              <select id="city" onchange="selectCity(this.value)">
+                <option value="" data-i18n="selectCity">— Select a city —</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="fld"><span data-i18n="radius">Radius</span>
+              <select id="radius"><option value="3">3 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option></select>
+            </label>
+            <label class="fld"><span data-i18n="minPower">Min power</span>
+              <select id="minpower"><option value="0" data-i18n="powAny">Any</option><option value="50" selected data-i18n="powFast">50 kW+ Fast</option><option value="150" data-i18n="powUltra">150 kW+ Ultra</option></select>
+            </label>
+            <label class="fld">&nbsp;<button class="btn btn-primary" id="rec-btn" onclick="recommend()" disabled data-i18n="recommend">Recommend</button></label>
+            <label class="fld">&nbsp;<button class="btn btn-eco" id="eq-btn" onclick="toggleEquity()" data-i18n="equity">🌍 Equity view</button></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel collapsed">
+        <h2 onclick="togglePanel(this)"><span data-i18n="demand">📈 Demand outlook · ZONE_GANGNAM (BQML ARIMA_PLUS)</span><span class="chev">▾</span></h2>
+        <div class="panel-body">
+          <svg class="spark" id="spark" viewBox="0 0 320 56" preserveAspectRatio="none"></svg>
+          <div class="spark-meta"><span id="spark-lo">—</span><span id="spark-peak">—</span></div>
+        </div>
+      </div>
+
+      <div class="chat-wrap">
+        <div class="chat-head">
+          <img id="agent-avatar" class="avatar" src="/static/ev-agent.png" alt="" onerror="this.style.display='none'" />
+          <span data-i18n="askAgent">Ask the EV-Charge Agent</span>
+        </div>
+        <div class="chat-scroll" id="chat-scroll">
+          <div class="results" id="results">
+            <div class="rec-empty" data-i18n-html="recEmpty">Set your location, then tap <b>Recommend</b>. The agent ranks chargers by distance, power & predicted congestion — and routes you there.</div>
+          </div>
+          <div id="chat-box">
+            <div class="message-bubble message-agent" id="intro-msg" data-i18n-html="intro">
+              Hi! I'm the <b>EV-Charge Agent</b>. I combine <b>real APAC station data</b>, <b>BigQuery ML demand forecasts</b>,
+              and Google Maps routing to recommend the smartest, greenest place to charge — and I explain <i>why</i>.
+            </div>
+          </div>
+          <div id="typing" data-i18n="thinking">The agent is thinking…</div>
+        </div>
+        <div class="quick">
+          <span class="chip" onclick="quick('Find a fast charger near me that won\'t be busy soon, and explain why')" data-i18n="chipSmart">Smart & not busy</span>
+          <span class="chip" onclick="quick('Where are the charging deserts near me?')" data-i18n="chipDesert">🌍 Charging deserts</span>
+          <span class="chip" onclick="quick('How much CO2 does this charging network help avoid?')" data-i18n="chipCo2">🌱 CO₂ impact</span>
+        </div>
+        <div class="chat-input-area">
+          <input type="text" class="chat-input" id="user-input" data-i18n-ph="placeholder" placeholder="e.g. Greenest fast charger within 10km, and route me there…" onkeypress="handleKeyPress(event)" />
+          <button class="btn btn-primary" onclick="sendMessage()" data-i18n="send">Send</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script>
+    // ---------- i18n ----------
+    const I18N = {
+      en: {
+        tagline:'AI Decision Intelligence for Smarter, Greener Communities · APAC',
+        kpiStations:'APAC stations', kpiPublic:'Public chargers %', kpiFast:'Fast / Ultra chargers',
+        kpiCo2:'CO₂ avoided / yr', kpiDesert:'Charging-desert cells', kpiDesertHint:'in current view · tap Equity',
+        myev:'🔋 My EV', vehicle:'Vehicle', battery:'Battery', range:'range', plug:'plug',
+        findCharging:'🚗 Find charging for my car', myCarLoc:'📍 My car location', jumpCity:'Jump to APAC city',
+        selectCity:'— Select a city —', radius:'Radius', minPower:'Min power',
+        powAny:'Any', powFast:'50 kW+ Fast', powUltra:'150 kW+ Ultra', recommend:'Recommend', equity:'🌍 Equity view',
+        recEmpty:'Set your location, then tap <b>Recommend</b>. The agent ranks chargers by distance, power & predicted congestion — and routes you there.',
+        demand:'📈 Demand outlook · ZONE_GANGNAM (BQML ARIMA_PLUS)',
+        askAgent:'Ask the EV-Charge Agent', thinking:'The agent is thinking…',
+        intro:"Hi! I'm the <b>EV-Charge Agent</b>. I combine <b>real APAC station data</b>, <b>BigQuery ML demand forecasts</b>, and Google Maps routing to recommend the smartest, greenest place to charge — and I explain <i>why</i>.",
+        chipSmart:'Smart & not busy', chipDesert:'🌍 Charging deserts', chipCo2:'🌱 CO₂ impact',
+        placeholder:'e.g. Greenest fast charger within 10km, and route me there…', send:'Send',
+        legendTitle:'Power', legUltra:'Ultra ≥150kW', legFast:'Fast ≥50kW', legStd:'Standard',
+        eqView:'🌍 Equity view', eqLoading:'🌍 Loading…', eqOn:'🌍 Equity: ON',
+        reachOk:'✅ reachable', reachTight:'⚠️ tight on battery', reachBad:'❌ out of range',
+        yourPlug:'🔌 your plug', best:'BEST', publicWord:'Public',
+        freeWord:'free', busyWord:'busy', offlineWord:'offline',
+        stepsHeader:'🧠 Agent reasoning · tools called', querying:'Querying BigQuery geospatial…',
+        noStations:'No stations in range. Widen radius or lower min power.', recFailed:'Recommendation failed.',
+        noMatch:'⚠️ No {conn}-compatible chargers in range — showing nearest options. Widen the search.',
+        sparkLo:'next 12h · low', sparkPeak:'peak', langInstr:'',
+      },
+      ko: {
+        tagline:'더 나은 삶과 스마트 시티를 위한 AI 의사결정 플랫폼 · APAC',
+        kpiStations:'APAC 충전소', kpiPublic:'공공 충전소 비율', kpiFast:'급속 / 초급속',
+        kpiCo2:'연간 CO₂ 절감량', kpiDesert:'충전 사각지대', kpiDesertHint:'현재 화면 기준 · ‘사각지대 보기’ 클릭',
+        myev:'🔋 내 차', vehicle:'차종', battery:'배터리', range:'주행거리', plug:'커넥터',
+        findCharging:'🚗 근처 충전소 찾기', myCarLoc:'📍 현재 위치', jumpCity:'APAC 도시 선택',
+        selectCity:'— 도시 선택 —', radius:'반경', minPower:'최소 전력',
+        powAny:'전체', powFast:'50 kW+ 급속', powUltra:'150 kW+ 초급속', recommend:'추천받기', equity:'🌍 사각지대 보기',
+        recEmpty:'위치를 설정하고 <b>추천받기</b>를 누르세요. 에이전트가 거리·전력·예상 혼잡도를 종합해 충전소 순위를 매기고 경로까지 안내해 드려요.',
+        demand:'📈 수요 예측 · ZONE_GANGNAM (BQML ARIMA_PLUS)',
+        askAgent:'EV-Charge 에이전트에게 물어보기', thinking:'에이전트가 분석 중…',
+        intro:'안녕하세요! <b>EV-Charge 에이전트</b>예요. <b>APAC 실제 충전소 데이터</b>와 <b>BigQuery ML 수요 예측</b>, Google Maps 경로를 결합해 가장 똑똑하고 친환경적인 충전소를 추천하고, 그 <i>이유</i>까지 설명해 드려요.',
+        chipSmart:'안 붐비는 급속', chipDesert:'🌍 충전 사각지대', chipCo2:'🌱 CO₂ 효과',
+        placeholder:'예: 10km 안에서 가장 친환경적인 급속충전소로 안내해줘…', send:'전송',
+        legendTitle:'충전 속도', legUltra:'초급속 ≥150kW', legFast:'급속 ≥50kW', legStd:'완속',
+        eqView:'🌍 사각지대 보기', eqLoading:'🌍 불러오는 중…', eqOn:'🌍 사각지대: 켜짐',
+        reachOk:'✅ 도착 가능', reachTight:'⚠️ 배터리 빠듯', reachBad:'❌ 도착 불가',
+        yourPlug:'🔌 내 차 호환', best:'최적', publicWord:'공공',
+        freeWord:'빈자리', busyWord:'만석', offlineWord:'점검 중',
+        stepsHeader:'🧠 에이전트 추론 · 사용한 도구', querying:'BigQuery 위치 검색 중…',
+        noStations:'범위 안에 충전소가 없어요. 반경을 넓히거나 최소 전력을 낮춰 보세요.', recFailed:'추천을 불러오지 못했어요.',
+        noMatch:'⚠️ 범위 안에 {conn} 호환 충전소가 없어요 — 가장 가까운 곳을 표시했어요. 반경을 넓혀 보세요.',
+        sparkLo:'향후 12시간 · 최저', sparkPeak:'최고', langInstr:' (자연스러운 한국어로 답변해 주세요.)',
+      },
+    };
+    let LANG = localStorage.getItem('lang') || 'en';
+    const t = k => (I18N[LANG] && I18N[LANG][k]) || I18N.en[k] || k;
+    function applyLang(lang){
+      LANG = lang; localStorage.setItem('lang', lang);
+      document.documentElement.lang = lang;
+      document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n')); });
+      document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.getAttribute('data-i18n-html')); });
+      document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))); });
+      const lb = document.getElementById('lang-btn'); if (lb) lb.textContent = lang==='en' ? '한국어' : 'EN';
+      if (typeof updateLegend === 'function') updateLegend();
+      if (typeof updateEV === 'function') updateEV();
+      const eq = document.getElementById('eq-btn'); if (eq && !equityOn) eq.textContent = t('eqView');
+      if (lastNearby.length) renderRecommendations(lastNearby);
+      refreshForecastLabels();
+    }
+    function toggleLang(){ applyLang(LANG==='en' ? 'ko' : 'en'); }
+    function togglePanel(h2){ h2.parentElement.classList.toggle('collapsed'); }
+
+    const map = L.map('map', { zoomControl: true }).setView([37.5503, 126.9971], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+
+    const clusterLayer = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
+    map.addLayer(clusterLayer);
+    const recLayer = L.layerGroup().addTo(map);
+    const equityLayer = L.layerGroup();
+    let routeLayer = null, routeBox = null;
+    let myMarker = null, myLatLng = null, equityOn = false, lastNearby = [], myLabel = '';
+    function carPopupHTML(){
+      const soc = EV.soc();
+      const col = soc>=60 ? '#1e8e3e' : soc>=30 ? '#f9ab00' : '#d93025';
+      return `<div class="car-pop">
+        <img class="car-pop-img" src="${vehicle.img}" alt="" onerror="this.style.display='none'"/>
+        <div class="car-pop-body">
+          <div class="car-pop-name">${EV.model()}</div>
+          <div class="car-pop-sub">${myLabel ? myLabel + ' · ' : ''}${EV.connLabel()}</div>
+          <div class="car-pop-batt"><span style="width:${soc}%;background:${col}"></span></div>
+          <div class="car-pop-stat">${soc}% · ~${EV.range()} km</div>
+        </div></div>`;
+    }
+
+    let legendDiv = null;
+    function updateLegend(){ if(!legendDiv) return;
+      legendDiv.innerHTML = `<b>${t('legendTitle')}</b><br><i style="background:#1e8e3e"></i>${t('legUltra')}<br><i style="background:#1a73e8"></i>${t('legFast')}<br><i style="background:#9aa0a6"></i>${t('legStd')}`; }
+    const legend = L.control({ position: 'bottomleft' });
+    legend.onAdd = () => { legendDiv = L.DomUtil.create('div', 'legend'); updateLegend(); return legendDiv; };
+    legend.addTo(map);
+
+    const powerColor = kw => kw >= 150 ? '#1e8e3e' : kw >= 50 ? '#1a73e8' : '#9aa0a6';
+    function chargerIcon(kw, opts){
+      opts = opts || {};
+      if (opts.rec){
+        const color = opts.best ? '#1e8e3e' : '#1a73e8';
+        const glyph = opts.label != null ? opts.label : '⚡';
+        return L.divIcon({ className:'', html:`<div class="chg-pin rec" style="background:${color}"><span>${glyph}</span></div>`,
+          iconSize:[30,30], iconAnchor:[15,30] });
+      }
+      const color = powerColor(kw||0);
+      return L.divIcon({ className:'', html:`<div class="chg-pin" style="background:${color}"><span>⚡</span></div>`,
+        iconSize:[20,20], iconAnchor:[10,20] });
+    }
+    function liveText(s) {
+      if (!s.live) return '';
+      const icon = s.live==='offline'?'⚫':(s.live==='available'?'🟢':'🟠');
+      const txt = s.live==='offline' ? 'offline' : `${s.available}/${s.total} plugs free`;
+      const src = s.source==='google_places' ? 'live · Google' : 'simulated';
+      return `${icon} ${txt} <span style="color:#9aa0a6">(${src})</span>`;
+    }
+    function stationPopup(s) {
+      const cost = s.usage_cost ? `<br>💳 ${s.usage_cost}` : '';
+      const dist = (s.distance_m != null) ? `<br>📍 ${(s.distance_m/1000).toFixed(2)} km away` : '';
+      const live = s.live ? `<br>${liveText(s)}` : '';
+      return `<b>${s.title || 'EV Charging Station'}</b><br>${s.operator || 'Unknown'} · ${s.town || ''}<br>⚡ ${s.max_power_kw || '?'} kW · ${s.connector_types || 'n/a'}${live}${cost}${dist}`;
+    }
+
+    // KPIs
+    async function loadKPIs() {
+      try {
+        const d = await (await fetch('/api/community_stats')).json();
+        document.getElementById('k-total').textContent = (d.total||0).toLocaleString();
+        document.getElementById('k-public').textContent = (d.public_pct||0) + '%';
+        document.getElementById('k-fast').textContent = (d.fast||0).toLocaleString() + ' / ' + (d.ultra||0).toLocaleString();
+        document.getElementById('k-co2').textContent = '~' + (d.co2_avoided_tonnes_yr||0).toLocaleString() + ' t';
+        document.getElementById('k-co2-h').textContent = d.co2_assumption || '';
+      } catch (e) { console.error(e); }
+    }
+    loadKPIs();
+
+    // Stations
+    async function loadStations() {
+      try {
+        const d = await (await fetch('/api/stations?limit=8000')).json();
+        const markers = [];
+        (d.stations||[]).forEach(s => {
+          if (s.lat==null||s.lon==null) return;
+          const m = L.marker([s.lat,s.lon], { icon: chargerIcon(s.max_power_kw) });
+          m.bindPopup(stationPopup(s)); markers.push(m);
+        });
+        clusterLayer.addLayers(markers);
+      } catch (e) { console.error(e); }
+    }
+    loadStations();
+
+    // Forecast sparkline
+    async function loadForecast() {
+      try {
+        const d = await (await fetch('/api/forecast?zone=ZONE_GANGNAM&horizon=12')).json();
+        const s = d.series||[]; if (!s.length) return;
+        const kws = s.map(p=>p.kw), lo=Math.min(...kws), hi=Math.max(...kws);
+        const W=320,H=56,pad=4;
+        const x=i=> pad + i*(W-2*pad)/(s.length-1);
+        const y=v=> H-pad - (v-lo)/((hi-lo)||1)*(H-2*pad);
+        let path = s.map((p,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(p.kw).toFixed(1)}`).join(' ');
+        let area = path + ` L${x(s.length-1)},${H} L${x(0)},${H} Z`;
+        document.getElementById('spark').innerHTML =
+          `<path d="${area}" fill="#e6f4ea"/><path d="${path}" fill="none" stroke="#1e8e3e" stroke-width="2"/>`;
+        fcLo = lo; fcHi = hi; refreshForecastLabels();
+      } catch (e) { console.error(e); }
+    }
+    let fcLo = null, fcHi = null;
+    function refreshForecastLabels(){
+      if (fcLo == null) return;
+      document.getElementById('spark-lo').textContent = `${t('sparkLo')} ${fcLo.toFixed(0)} kW`;
+      document.getElementById('spark-peak').textContent = `${t('sparkPeak')} ${fcHi.toFixed(0)} kW`;
+    }
+    loadForecast();
+
+    // ---- My EV state (vehicle-driven) ----
+    function carIcon(){
+      return L.divIcon({ className:'car-marker',
+        html:`<img src="${vehicle.img}" alt="🚗" onerror="this.replaceWith(document.createTextNode('🚗'))" style="width:52px;height:34px;object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45));"/>`,
+        iconSize:[52,34], iconAnchor:[26,17] });
+    }
+    // Representative APAC EV models. `conn` matches OCM connector_types substrings.
+    const VEHICLES = [
+      { id:'ioniq5', name:'Hyundai IONIQ 5', conn:'ccs',     connLabel:'CCS',        range:430, img:'/static/vehicles/ioniq5.png' },
+      { id:'ev6',    name:'Kia EV6',         conn:'ccs',     connLabel:'CCS',        range:480, img:'/static/vehicles/ev6.png' },
+      { id:'model3', name:'Tesla Model 3',   conn:'tesla',   connLabel:'Tesla/NACS', range:510, img:'/static/vehicles/model3.png' },
+      { id:'bz4x',   name:'Toyota bZ4X',     conn:'chademo', connLabel:'CHAdeMO',    range:450, img:'/static/vehicles/bz4x.png' },
+      { id:'leaf',   name:'Nissan Leaf',     conn:'chademo', connLabel:'CHAdeMO',    range:270, img:'/static/vehicles/leaf.png' },
+      { id:'atto3',  name:'BYD Atto 3',      conn:'ccs',     connLabel:'CCS',        range:400, img:'/static/vehicles/atto3.png' },
+      { id:'nexon',  name:'Tata Nexon EV',   conn:'ccs',     connLabel:'CCS',        range:310, img:'/static/vehicles/nexon.png' },
+    ];
+    let vehicle = VEHICLES[0];
+    (function fillVehicles(){
+      const sel=document.getElementById('vehicle');
+      VEHICLES.forEach(v=>{ const o=document.createElement('option'); o.value=v.id; o.textContent=v.name; sel.appendChild(o); });
+    })();
+    const EV = {
+      soc: () => +document.getElementById('soc').value,
+      full: () => vehicle.range,
+      range: () => Math.round(vehicle.range * (+document.getElementById('soc').value)/100),
+      conn: () => vehicle.conn,
+      connLabel: () => vehicle.connLabel,
+      model: () => vehicle.name,
+    };
+    function selectVehicle(id){ const v=VEHICLES.find(x=>x.id===id); if(v){ vehicle=v; document.getElementById('vehicle').value=id; } updateEV(); }
+    function updateEV(){
+      const vimg = document.getElementById('veh-img');
+      if (vimg && vehicle.img) { vimg.style.visibility='visible'; vimg.src = vehicle.img; }
+      const soc = EV.soc();
+      document.getElementById('soc-val').textContent = soc+'%';
+      document.getElementById('range-val').textContent = EV.range()+' km';
+      document.getElementById('conn-chip').textContent = '🔌 ' + EV.connLabel();
+      const fill = document.getElementById('batt-fill');
+      if (fill) { fill.style.width = soc+'%';
+        fill.style.background = soc>=60 ? '#1e8e3e' : soc>=30 ? '#f9ab00' : '#d93025'; }
+      if (myMarker && myLatLng) {
+        myMarker.setIcon(carIcon());
+        myMarker.setPopupContent(carPopupHTML());
+      }
+      if (lastNearby.length) renderRecommendations(lastNearby);
+    }
+    updateEV();
+
+    // Location (the car's position)
+    function setMyLocation(lat, lon, label) {
+      myLatLng = [lat, lon];
+      myLabel = (label || 'My car').replace(/[\u{1F1E6}-\u{1F1FF}]/gu, '').trim();
+      if (myMarker) map.removeLayer(myMarker);
+      myMarker = L.marker([lat,lon], { icon: carIcon(), zIndexOffset:1000 })
+        .addTo(map).bindPopup(carPopupHTML(), { closeButton:false }).openPopup();
+      map.setView([lat,lon], 13);
+      document.getElementById('rec-btn').disabled = false;
+    }
+    function useMyLocation() {
+      const b = document.getElementById('loc-btn'); b.textContent='Locating…';
+      if (!navigator.geolocation) { alert('Geolocation not supported'); b.textContent='📍 Use my location'; return; }
+      navigator.geolocation.getCurrentPosition(
+        p => { setMyLocation(p.coords.latitude, p.coords.longitude); b.textContent='📍 Location set'; },
+        e => { alert('Could not get location. Try a Demo button.'); b.textContent='📍 Use my location'; },
+        { enableHighAccuracy:true, timeout:8000 });
+    }
+    // APAC major cities — ordered by importance (financial/tech-hub prominence).
+    // route: 'google' = Google Maps driving supported; 'osrm' = falls back (e.g. Korea).
+    const CITIES = [
+      { id:'seoul',    name:'Seoul 🇰🇷',        lat:37.4979, lon:127.0276, route:'osrm'   },
+      { id:'tokyo',    name:'Tokyo 🇯🇵',        lat:35.6812, lon:139.7671, route:'google' },
+      { id:'singapore',name:'Singapore 🇸🇬',    lat:1.3521,  lon:103.8198, route:'google' },
+      { id:'hongkong', name:'Hong Kong 🇭🇰',    lat:22.3193, lon:114.1694, route:'google' },
+      { id:'sydney',   name:'Sydney 🇦🇺',       lat:-33.8688,lon:151.2093, route:'google' },
+      { id:'taipei',   name:'Taipei 🇹🇼',       lat:25.0330, lon:121.5654, route:'google' },
+      { id:'mumbai',   name:'Mumbai 🇮🇳',       lat:19.0760, lon:72.8777,  route:'google' },
+      { id:'delhi',    name:'Delhi 🇮🇳',        lat:28.6139, lon:77.2090,  route:'google' },
+      { id:'jakarta',  name:'Jakarta 🇮🇩',      lat:-6.2088, lon:106.8456, route:'google' },
+      { id:'bangkok',  name:'Bangkok 🇹🇭',      lat:13.7563, lon:100.5018, route:'google' },
+      { id:'kl',       name:'Kuala Lumpur 🇲🇾', lat:3.1390,  lon:101.6869, route:'google' },
+      { id:'manila',   name:'Manila 🇵🇭',       lat:14.5995, lon:120.9842, route:'google' },
+      { id:'auckland', name:'Auckland 🇳🇿',     lat:-36.8485,lon:174.7633, route:'google' },
+    ];
+    (function fillCities(){
+      const sel = document.getElementById('city');
+      CITIES.forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+    })();
+    // Each APAC city demos a representative local EV model.
+    const CITY_VEHICLE = { seoul:'ioniq5', tokyo:'bz4x', singapore:'atto3', hongkong:'model3',
+      sydney:'model3', taipei:'model3', mumbai:'nexon', delhi:'nexon', jakarta:'ioniq5',
+      bangkok:'atto3', kl:'atto3', manila:'leaf', auckland:'model3' };
+    function selectCity(id) {
+      const c = CITIES.find(x=>x.id===id); if (!c) return;
+      if (CITY_VEHICLE[id]) selectVehicle(CITY_VEHICLE[id]);
+      setMyLocation(c.lat, c.lon, c.name);
+    }
+
+    // Recommend
+    async function recommend() {
+      if (!myLatLng) { alert('Set your location first'); return; }
+      const radius = document.getElementById('radius').value;
+      const minp = document.getElementById('minpower').value;
+      const box = document.getElementById('results');
+      box.innerHTML = `<div class="rec-empty">${t('querying')}</div>`;
+      recLayer.clearLayers();
+      try {
+        const d = await (await fetch(`/api/nearby?lat=${myLatLng[0]}&lon=${myLatLng[1]}&radius_km=${radius}&min_power_kw=${minp}&connector=${encodeURIComponent(EV.conn())}&limit=14`)).json();
+        const all = d.stations||[];
+        if (!all.length) { lastNearby=[]; box.innerHTML=`<div class="rec-empty">${t('noStations')}</div>`; return; }
+        // Show only chargers compatible with the car's connector; if none, fall back to nearest.
+        const matches = all.filter(s => s.is_match);
+        const show = (matches.length ? matches : all).slice(0, 6);
+        lastNearby = show;
+        renderRecommendations(show);
+        drawRoute(show[0]);
+        const minLabel = minp==='0'?'any-power':`${minp}kW+`;
+        askAgent(`My EV is a ${EV.model()} (${EV.connLabel()} connector), battery at ${EV.soc()}% (~${EV.range()} km range). `+
+          `I'm at latitude ${myLatLng[0].toFixed(4)}, longitude ${myLatLng[1].toFixed(4)}. `+
+          `Recommend the best ${minLabel} charging station within ${radius}km that is reachable on my current battery and matches my connector. `+
+          `Explain why using distance, power/connector match and likely upcoming congestion, then give the driving ETA.`, true);
+      } catch (e) { box.innerHTML=`<div class="rec-empty">${t('recFailed')}</div>`; console.error(e); }
+    }
+
+    // Render recommendation cards with car-aware reachability + connector badges.
+    function renderRecommendations(list) {
+      const box = document.getElementById('results');
+      const rangeKm = EV.range(), conn = EV.conn();
+      recLayer.clearLayers();
+      box.innerHTML = '';
+      const compatible = list.filter(s => s.is_match).length;
+      if (compatible === 0) {
+        const w = document.createElement('div');
+        w.className = 'rec-warn';
+        w.innerHTML = t('noMatch').replace('{conn}', EV.connLabel());
+        box.appendChild(w);
+      }
+      list.forEach((s, i) => {
+        const mk = L.marker([s.lat,s.lon], { icon: chargerIcon(s.max_power_kw, {rec:true, best:i===0, label:String(i+1)}), zIndexOffset:500 }).bindPopup(stationPopup(s));
+        recLayer.addLayer(mk);
+        // reachability: driving ≈ straight-line × 1.3 detour factor
+        const driveKm = (s.distance_m/1000) * 1.3;
+        let reach = driveKm <= rangeKm*0.8 ? [t('reachOk'),'ok']
+                  : driveKm <= rangeKm ? [t('reachTight'),'warn']
+                  : [t('reachBad'),'bad'];
+        const match = !!s.is_match;
+        const connPill = match ? `<span class="pill match">${t('yourPlug')}</span>`
+                               : `<span class="pill conn">${(s.connector_types||'n/a').split(',')[0]}</span>`;
+        const pub = /public/i.test(s.usage_type||'') ? `<span class="pill pub">${t('publicWord')}</span>` : '';
+        let livePill = '';
+        if (s.live) {
+          const lc = s.live==='available'?'ok':(s.live==='busy'?'warn':'bad');
+          const lt = s.live==='offline' ? `⚫ ${t('offlineWord')}`
+                   : s.live==='busy' ? `🟠 ${t('busyWord')}`
+                   : `🟢 ${s.available}/${s.total} ${t('freeWord')}`;
+          livePill = `<span class="pill ${lc}">${lt}</span>`;
+        }
+        const card = document.createElement('div');
+        card.className = 'rec' + (i===0?' top':'');
+        card.innerHTML =
+          `<div class="name">${i===0?`<span class="pill best">${t('best')}</span> `:''}${s.title||'Station'}</div>`+
+          `<div class="meta">${s.operator||'Unknown'} · ${s.town||''}</div>`+
+          `<div class="why">${livePill}<span class="pill dist">📍 ${(s.distance_m/1000).toFixed(2)} km</span>`+
+          `<span class="pill kw">⚡ ${s.max_power_kw||'?'} kW</span>`+
+          `${connPill}<span class="pill ${reach[1]}">${reach[0]}</span>${pub}</div>`;
+        card.onclick = () => { drawRoute(s); mk.openPopup(); };
+        box.appendChild(card);
+      });
+    }
+
+    // Hybrid route (Google → OSRM fallback)
+    async function drawRoute(station) {
+      if (!myLatLng) return;
+      try {
+        const r = await (await fetch(`/api/route?from_lat=${myLatLng[0]}&from_lon=${myLatLng[1]}&to_lat=${station.lat}&to_lon=${station.lon}`)).json();
+        if (routeLayer) map.removeLayer(routeLayer);
+        if (!r.coords || !r.coords.length) return;
+        routeLayer = L.polyline(r.coords, { color:'#1a73e8', weight:5, opacity:.8 }).addTo(map);
+        map.fitBounds(routeLayer.getBounds(), { padding:[60,60] });
+        const km = ((r.distance_m||0)/1000).toFixed(1), min = Math.round((r.duration_s||0)/60);
+        const prov = r.provider==='google'?'<span class="prov google">via Google Maps</span>':'<span class="prov osrm">via OpenStreetMap</span>';
+        if (routeBox) map.removeControl(routeBox);
+        routeBox = L.control({ position:'topright' });
+        routeBox.onAdd = () => { const d=L.DomUtil.create('div','routebox');
+          d.innerHTML = `🧭 <b>${km} km · ${min} min</b>${prov}`; return d; };
+        routeBox.addTo(map);
+      } catch (e) { console.error(e); }
+    }
+
+    // Equity / charging-desert overlay
+    async function toggleEquity() {
+      const btn = document.getElementById('eq-btn');
+      if (equityOn) { map.removeLayer(equityLayer); equityLayer.clearLayers(); equityOn=false; btn.classList.remove('active'); btn.textContent=t('eqView'); document.getElementById('k-desert').textContent='—'; return; }
+      btn.classList.add('active'); btn.textContent=t('eqLoading');
+      const b = map.getBounds();
+      try {
+        const d = await (await fetch(`/api/coverage?south=${b.getSouth()}&west=${b.getWest()}&north=${b.getNorth()}&east=${b.getEast()}`)).json();
+        equityLayer.clearLayers();
+        const step = d.cell_deg || 0.02;
+        (d.cells||[]).forEach(c => {
+          if (c.nearest_m == null) return;
+          const m = c.nearest_m;
+          const col = m>5000?'#d93025': m>2000?'#f9ab00': m>1000?'#fbbc04':'#1e8e3e';
+          L.rectangle([[c.lat-step/2,c.lon-step/2],[c.lat+step/2,c.lon+step/2]],
+            { color:col, weight:0, fillColor:col, fillOpacity:m>2000?.34:.16 })
+            .bindPopup(`Nearest charger: <b>${(m/1000).toFixed(1)} km</b>${m>2000?' · ⚠️ charging desert':''}`)
+            .addTo(equityLayer);
+        });
+        equityLayer.addTo(map); equityOn=true;
+        btn.textContent=t('eqOn');
+        document.getElementById('k-desert').textContent = (d.deserts||0) + ' (' + (d.desert_pct||0) + '%)';
+      } catch (e) { console.error(e); btn.textContent=t('eqView'); btn.classList.remove('active'); }
+    }
+
+    // Chat
+    const chatBox = document.getElementById('chat-box');
+    const chatScroll = document.getElementById('chat-scroll');
+    const scrollChat = () => { chatScroll.scrollTop = chatScroll.scrollHeight; };
+    const userInput = document.getElementById('user-input');
+    const typing = document.getElementById('typing');
+    function handleKeyPress(e){ if(e.key==='Enter') sendMessage(); }
+    function quick(t){ userInput.value=t; sendMessage(); }
+    function appendMessage(text, sender){ const b=document.createElement('div'); b.className=`message-bubble message-${sender}`;
+      if(sender==='agent') b.innerHTML=formatMarkdown(text); else b.textContent=text; chatBox.appendChild(b); scrollChat(); }
+    function startSteps(){ const d=document.createElement('div'); d.className='steps';
+      d.innerHTML=`<b>${t('stepsHeader')}</b>`; chatBox.appendChild(d); scrollChat(); return d; }
+    function addStep(d,label){ const s=document.createElement('div'); s.textContent=label; d.appendChild(s); scrollChat(); }
+    function startAgentBubble(){ const b=document.createElement('div'); b.className='message-bubble message-agent'; chatBox.appendChild(b); scrollChat(); return b; }
+
+    // Streaming chat: live tool-call trace + token-by-token answer (SSE/NDJSON).
+    async function askAgent(message, silent){
+      if(!silent) appendMessage(message,'user');
+      typing.style.display='block'; scrollChat();
+      const payload = message + (LANG==='ko' ? t('langInstr') : '');
+      let stepsDiv=null, bubble=null, acc='';
+      try {
+        const resp = await fetch('/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:payload})});
+        const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf='';
+        while(true){
+          const {value, done} = await reader.read(); if(done) break;
+          buf += dec.decode(value,{stream:true});
+          let nl;
+          while((nl = buf.indexOf('\n')) >= 0){
+            const line = buf.slice(0,nl); buf = buf.slice(nl+1);
+            if(!line.trim()) continue;
+            let ev; try { ev = JSON.parse(line); } catch(_) { continue; }
+            if(ev.type==='step'){ if(!stepsDiv) stepsDiv=startSteps(); addStep(stepsDiv, ev.label); }
+            else if(ev.type==='token'){ typing.style.display='none'; if(!bubble) bubble=startAgentBubble();
+              acc += ev.text; bubble.innerHTML = formatMarkdown(acc); scrollChat(); }
+          }
+        }
+        typing.style.display='none';
+        if(!bubble) appendMessage('(no response)','agent');
+      } catch(e){ typing.style.display='none'; appendMessage('Error reaching the agent server.','agent'); console.error(e); }
+    }
+    function sendMessage(){ const t=userInput.value.trim(); if(!t) return; userInput.value='';
+      let msg=t;
+      msg += ` (My EV: ${EV.model()}, ${EV.connLabel()} connector, battery ${EV.soc()}%, ~${EV.range()} km range.`;
+      if(myLatLng) msg += ` My car location: latitude ${myLatLng[0].toFixed(4)}, longitude ${myLatLng[1].toFixed(4)}.`;
+      msg += `)`;
+      appendMessage(t,'user'); askAgent(msg,true); }
+    function formatMarkdown(text){ if(!text) return '';
+      let f=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      f=f.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/`([^`]+)`/g,'<code>$1</code>');
+      f=f.replace(/(?:^|\n)\s*[\*\-]\s+(.*?)(?=\n|$)/g,'<li>$1</li>').replace(/\n/g,'<br>');
+      if(f.includes('<li>')) f=f.replace(/(<li>.*<\/li>)/s,'<ul>$1</ul>'); return f; }
+
+    // Apply saved/initial language once everything is defined.
+    applyLang(LANG);
+  </script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+# Secrets and machine-local environment
+.env
+.env.*
+!.env.example
+!.env.template
+.envrc
+credentials.json
+application_default_credentials.json
+client_secret*.json
+service-account*.json
+gcp-service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# OS and editors
+.DS_Store
+.AppleDouble
+.LSOverride
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local agent settings and scratch work
+.claude/settings.local.json
+_workspace/
+
+# Generated data exports
+scripts/_ocm_apac.ndjson
+
+# Video production sources and rendered media
+docs/builder/
+docs/submission/*.mp4
+
+# Overnight harness runtime state
+scripts/overnight/logs/
+scripts/overnight/STOP
+scripts/overnight/DONE
+docs/test/history/*-overnight-review-checklist.md

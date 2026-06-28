@@ -1,0 +1,8 @@
+google-antigravity>=0.1.4
+google-adk>=2.3.0
+toolbox-core>=1.1.0
+flask>=3.0.0
+python-dotenv>=1.1.0
+pyyaml>=6.0.2
+google-cloud-aiplatform>=1.158.0
+google-cloud-bigquery>=3.20.0

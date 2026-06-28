@@ -1,0 +1,22 @@
+# Keep secrets and local dev artifacts out of the Cloud Build context.
+# Exclude everything by default, then whitelist exactly what each build needs.
+*
+
+# --- MCP Toolbox image (root Dockerfile) ---
+!Dockerfile
+!tools.yaml
+
+# --- Web app image (Dockerfile.web / cloudbuild.web.yaml) ---
+!Dockerfile.web
+!cloudbuild.web.yaml
+!requirements.txt
+!agent.py
+!mcp_server_local.py
+!templates
+!templates/**
+!static
+!static/**
+# …but keep the heavy originals and notes out of the image
+static/_orig/
+static/_orig/**
+static/**/README.txt

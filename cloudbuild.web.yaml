@@ -1,0 +1,12 @@
+# cloudbuild.web.yaml — builds the Flask web app image using Dockerfile.web
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.web
+      - -t
+      - gcr.io/$PROJECT_ID/ev-charge-web:latest
+      - .
+images:
+  - gcr.io/$PROJECT_ID/ev-charge-web:latest

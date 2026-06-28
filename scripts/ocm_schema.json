@@ -1,0 +1,20 @@
+[
+  {"name": "station_id", "type": "INTEGER", "mode": "REQUIRED"},
+  {"name": "title", "type": "STRING"},
+  {"name": "address", "type": "STRING"},
+  {"name": "town", "type": "STRING"},
+  {"name": "state", "type": "STRING"},
+  {"name": "country_code", "type": "STRING"},
+  {"name": "lat", "type": "FLOAT"},
+  {"name": "lon", "type": "FLOAT"},
+  {"name": "geog", "type": "GEOGRAPHY"},
+  {"name": "operator", "type": "STRING"},
+  {"name": "usage_type", "type": "STRING"},
+  {"name": "usage_cost", "type": "STRING"},
+  {"name": "status", "type": "STRING"},
+  {"name": "is_operational", "type": "BOOLEAN"},
+  {"name": "num_points", "type": "INTEGER"},
+  {"name": "max_power_kw", "type": "FLOAT"},
+  {"name": "connector_types", "type": "STRING"},
+  {"name": "date_last_verified", "type": "TIMESTAMP"}
+]

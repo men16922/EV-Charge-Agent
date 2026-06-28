@@ -1,0 +1,82 @@
+# tools.yaml
+sources:
+  # [TEMP-DISABLED until AlloyDB live] The toolbox connects to every source at
+  # startup; with no AlloyDB instance yet the container fails to boot. Re-enable
+  # once ev-charge-primary exists, password is set, and SA has roles/alloydb.client.
+  # alloydb-source:
+  #   kind: "alloydb-postgres"
+  #   project: "project-ec7809f7-0fb5-45d4-b6d"
+  #   region: "us-central1"
+  #   cluster: "ev-charge-alloydb-cluster"
+  #   instance: "ev-charge-primary"
+  #   database: "ev_charge_db"
+  #   user: "postgres"
+  #   password: "your-alloydb-password"
+  #   ipType: "private"
+
+  bigquery-source:
+    kind: "bigquery"
+    project: "project-ec7809f7-0fb5-45d4-b6d"
+    location: "US"
+
+tools:
+  # Migrated from AlloyDB to BigQuery to keep the platform serverless / scale-to-zero
+  # (minimum cost: BigQuery free tier instead of always-on AlloyDB). All three tools
+  # now share bigquery-source.
+  check_charger_status:
+    kind: bigquery-sql
+    source: bigquery-source
+    description: Checks the real-time status (active, idle, broken) and telemetry of a specific EV charger.
+    statement: |
+      SELECT charger_id, status, current_load_kw, error_code, last_updated
+      FROM `project-ec7809f7-0fb5-45d4-b6d.ev_data_schema.live_charger_status`
+      WHERE charger_id = @charger_id;
+    parameters:
+      - name: charger_id
+        type: string
+        description: The unique identifier of the EV charger (e.g., 'CHG-1004').
+
+  search_manual_embeddings:
+    kind: bigquery-sql
+    source: bigquery-source
+    description: Searches the EV charger operating manuals for troubleshooting steps or specs. Pass a single error code or keyword (e.g. 'ERR_OVERHEATING', 'overheating', 'connection timeout').
+    statement: |
+      SELECT section_title, troubleshooting_steps, error_code
+      FROM `project-ec7809f7-0fb5-45d4-b6d.ev_data_schema.ev_charger_manuals`
+      WHERE STRPOS(LOWER(section_title), LOWER(@query_text)) > 0
+         OR STRPOS(LOWER(troubleshooting_steps), LOWER(@query_text)) > 0
+         OR STRPOS(LOWER(@query_text), LOWER(error_code)) > 0
+      ORDER BY CASE WHEN STRPOS(LOWER(@query_text), LOWER(error_code)) > 0 THEN 0 ELSE 1 END
+      LIMIT @limit_count;
+    parameters:
+      - name: query_text
+        type: string
+        description: The search query or error description (e.g. 'overheating', 'ERR_CONN_TIMEOUT').
+      - name: limit_count
+        type: integer
+        description: The maximum number of manual entries to return.
+
+  predict_charging_demand:
+    kind: bigquery-sql
+    source: bigquery-source
+    description: Queries the BigQuery ML ARIMA_PLUS model to forecast EV charging demand for a specific zone and holiday timeline.
+    statement: |
+      SELECT forecast_timestamp, forecast_value, prediction_interval_lower_bound, prediction_interval_upper_bound
+      FROM ML.FORECAST(MODEL `project-ec7809f7-0fb5-45d4-b6d.ev_data_schema.ev_demand_forecast_model`,
+                       STRUCT(168 AS horizon, 0.95 AS confidence_level))
+      WHERE zone_id = @zone_id
+      ORDER BY forecast_timestamp
+      LIMIT @forecast_horizon;
+    parameters:
+      - name: zone_id
+        type: string
+        description: The geographic zone ID to forecast demand for (e.g. 'ZONE_GANGNAM').
+      - name: forecast_horizon
+        type: integer
+        description: The forecasting timeline horizon (e.g., 24 for 24 hours, 7 for 7 days).
+
+toolsets:
+  ev_agent_tools:
+    - check_charger_status
+    - search_manual_embeddings
+    - predict_charging_demand
