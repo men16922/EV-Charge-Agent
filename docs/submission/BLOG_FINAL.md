@@ -20,6 +20,13 @@ I built **EV-Charge Agent** to make that decision explicit. A driver selects a v
 
 The same data also supports a second audience: city planners deciding where charging infrastructure is missing.
 
+<!-- MEDIUM SCREENSHOT 1 — HERO
+Insert here: Full EV-Charge Agent dashboard after selecting Seoul and Hyundai IONIQ 5.
+Show: map with ranked charger markers, My EV panel, battery gauge, KPI strip, and chat panel in one frame.
+Crop: browser chrome and personal account information; keep the product name and main controls visible.
+Suggested caption: EV-Charge Agent combines vehicle state, charging infrastructure, and an AI copilot in one decision interface.
+-->
+
 ## Why APAC changes the architecture
 
 A single-provider happy path was not enough for this project.
@@ -78,6 +85,10 @@ Flask application on Cloud Run
 
 The public application runs on Cloud Run. Chat responses use Server-Sent Events (SSE), allowing the interface to stream both answer tokens and tool-execution events as they occur.
 
+![EV-Charge Agent architecture on Google Cloud](ev-charge-agent-architecture.png)
+
+*EV-Charge Agent architecture on Google Cloud, with deterministic tools behind the Gemini orchestration layer.*
+
 ## 1. Loading APAC charging data into BigQuery
 
 The data pipeline ingests **7,842 Open Charge Map locations across 13 APAC countries** into a BigQuery table named `ev_charging_stations`.
@@ -112,6 +123,13 @@ This creates an important failure mode that the system must report honestly. If 
 
 That negative result is useful information. It is also more trustworthy than silently relaxing a hard constraint.
 
+<!-- MEDIUM SCREENSHOT 3 — VEHICLE-AWARE FILTERING
+Insert here: My EV panel beside recommendation cards for a connector-compatibility test.
+Show: selected vehicle, connector type, battery percentage, estimated range, and reachable/tight/out-of-range badges.
+Preferred scenario: the verified Gangnam CHAdeMO zero-match case, so the UI visibly refuses to recommend an incompatible charger.
+Suggested caption: Connector compatibility and remaining range are hard constraints, not cosmetic ranking signals.
+-->
+
 ## 3. Forecasting congestion with BigQuery ML
 
 Distance alone is a poor ranking signal. The closest charger may be the worst option if demand is about to peak.
@@ -121,6 +139,13 @@ The project uses a BigQuery ML `ARIMA_PLUS` model to forecast charging demand. T
 [`ARIMA_PLUS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-create-time-series) handles time-series preparation and automatic model selection inside BigQuery. This keeps training and inference close to the operational data and avoids a separate model-serving service for the demo.
 
 There is an important limitation: the current model was trained on the **Gangnam demand zone**. Seoul is therefore the strongest forecasting demo. For other cities, the agent can still use station, connector, routing, and status data, but city-specific congestion predictions require local training data. I surface this as a limitation rather than presenting generalized estimates as equally validated forecasts.
+
+<!-- MEDIUM SCREENSHOT 4 — DEMAND FORECAST
+Insert here: Gangnam demand forecast visualization from the live dashboard.
+Show: forecast sparkline or chart, forecast time window, and predicted load values; include the related agent recommendation if both remain legible.
+Crop: focus on the forecast evidence rather than the full page.
+Suggested caption: BigQuery ML ARIMA_PLUS adds expected congestion to distance, power, and connector fit.
+-->
 
 ## 4. Routing with a regional fallback
 
@@ -134,6 +159,13 @@ The route tool follows a simple provider strategy:
 This pattern preserves the higher-value Google route when it is available while keeping regional coverage resilient. It also isolates provider-specific behavior inside one tool, so the rest of the agent does not need country-specific branching.
 
 The fallback is based on observed application behavior, not an assumption that one provider has identical feature coverage in every country. Google publishes current feature coverage in the [Routes API coverage documentation](https://developers.google.com/maps/documentation/routes/coverage).
+
+<!-- MEDIUM SCREENSHOT 5 — HYBRID ROUTING
+Insert here: Side-by-side route results for Tokyo and Seoul.
+Show: Tokyo labeled as Google/traffic-aware and Seoul labeled as the OSM/OSRM fallback, with distance and ETA visible for both.
+Crop: use matching map scale and card layout where possible so the provider difference is immediately understandable.
+Suggested caption: The routing tool prefers Google Routes and normalizes an OSRM fallback when a usable route is unavailable.
+-->
 
 ## 5. Showing execution evidence without exposing chain-of-thought
 
@@ -150,6 +182,13 @@ The final response then summarizes the decision using concrete factors such as r
 
 For this use case, showing tool activity improved trust more than adding another paragraph of generated explanation. A driver can verify that the answer came from data and services rather than from the language model inventing a plausible station.
 
+<!-- MEDIUM SCREENSHOT 6 — LIVE TOOL TRACE
+Insert here: Streaming chat while a charger recommendation is being generated.
+Show: the user question, two or more tool-call events, and the final recommendation with its supporting factors.
+Crop: keep tool names and evidence readable; exclude any API keys, project identifiers, or developer console details.
+Suggested caption: The interface exposes tool execution and retrieved evidence without presenting private model chain-of-thought.
+-->
+
 ## 6. Reusing the data for community planning
 
 The driver workflow answers, “Where should I charge next?” The planning workflow asks, “Where should the next charger be built?”
@@ -159,6 +198,13 @@ The coverage tool analyzes station distance across a geospatial grid and highlig
 The CO₂ value is explicitly an estimate based on model assumptions, not a measured emissions inventory. Its purpose is to make the impact model visible and comparable, while the charging-desert layer provides the more direct infrastructure signal.
 
 This dual use is the central product idea: one data platform can support an immediate driver decision and a longer-term city investment decision.
+
+<!-- MEDIUM SCREENSHOT 7 — COMMUNITY INTELLIGENCE
+Insert here: Equity/charging-desert map with the community KPI strip.
+Show: underserved-area overlay, station distribution, public-charger share, and estimated CO₂-avoidance metric.
+Crop: keep the map legend and the estimate label visible so the visualization is not presented without context.
+Suggested caption: The same geospatial dataset highlights underserved areas and supports city-level infrastructure planning.
+-->
 
 ## Deployment and cost controls
 

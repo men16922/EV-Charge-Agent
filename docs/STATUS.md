@@ -10,13 +10,14 @@
 - **채팅 = SSE 스트리밍 + 라이브 추론 트레이스 + 요청별 세션** (Green)
 - **UI**: 지도(좌)+접이식 패널(우), KPI, 차종 7종(투명 이미지·배터리 게이지), Equity 사각지대, 수요 스파크라인, 한국어 토글 (Green)
 - **비용 가드**: 레이트리밋(IP/분 + 전역 일일 하드캡: chat 600/route 500/live 150) (Green)
+- **데모 영상**: 영문 음성 및 이중 영문 자막이 포함된 유튜브용 최종 데모 영상 편집 완료 ([youtube_final.mp4](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/docs/submission/youtube_final.mp4)) (Green)
 - **로컬 검증**: Playwright 누적 50+ 케이스 통과. (`make check`는 신규 엔드포인트 미반영 — unverified)
 
 ## Active Focus
 
 권위: [NEXT_PLAN.md](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/docs/NEXT_PLAN.md).
 
-- 7월 Meet the Builders 제출 준비. 영상·블로그 **정본 스크립트 완료**(`docs/submission/*_FINAL.md`). 다음은 LinkedIn 티저(영상만) → 7월 발행. 공개 전 안전장치(예산·Maps 쿼터) 권장.
+- 7월 Meet the Builders 제출 준비. 유튜브 풀 데모 영상 컴파일 완료. dev.to 아티클 초안 검토 및 YouTube 업로드 준비. 공개 전 안전장치(예산·Maps 쿼터) 권장.
 
 ## Open Risks
 

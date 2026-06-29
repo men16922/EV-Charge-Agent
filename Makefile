@@ -12,6 +12,27 @@ check: ## Run deterministic offline check (compilation and mock evaluation)
 	python3 agent_eval.py
 	@echo "=== Check PASSED ==="
 
+# ===== Google Places API (New) toggle: PAID (real POIs) vs FREE (simulated) =====
+# The Maps API key in .env belongs to this project; Places must be enabled there.
+# Override with: make places-on PLACES_PROJECT=<your-project-id>
+PLACES_PROJECT ?= gen-lang-client-0983122780
+
+places-on: ## Enable Google Places API (New) -> real nearby POIs (PAID ~3 cents/call; app caps 50/day)
+	@echo "=== Enabling Places API (New) on $(PLACES_PROJECT) (PAID) ==="
+	gcloud services enable places.googleapis.com --project=$(PLACES_PROJECT)
+	@echo "=== Done. /api/poi now returns real POIs (app caps it to 50/day). ==="
+	@echo "Reminder: set a GCP budget alert + Maps daily quota before heavy use."
+
+places-off: ## Disable Google Places API (New) -> simulated POIs only (FREE)
+	@echo "=== Disabling Places API (New) on $(PLACES_PROJECT) (FREE / simulated) ==="
+	gcloud services disable places.googleapis.com --project=$(PLACES_PROJECT) --force
+	@echo "=== Done. /api/poi falls back to deterministic simulated POIs. ==="
+
+places-status: ## Show whether Places API (New) is enabled
+	@gcloud services list --enabled --project=$(PLACES_PROJECT) \
+	  --filter="config.name:places.googleapis.com" --format='value(config.name)' \
+	  | grep -q places && echo "Places API (New): ENABLED (PAID)" || echo "Places API (New): DISABLED (FREE/simulated)"
+
 # ===== overnight harness targets (append to your Makefile) =====
 # The overnight runner + helpers are the Single Source of Truth in the overnight-harness
 # PLUGIN; this repo does NOT vendor them. These targets resolve the installed plugin at

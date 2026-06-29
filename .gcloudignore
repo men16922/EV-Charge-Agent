@@ -20,3 +20,12 @@
 static/_orig/
 static/_orig/**
 static/**/README.txt
+
+# React (Vite) frontend source — built inside Dockerfile.web (node stage).
+!frontend
+!frontend/**
+# …but never ship node_modules or a local build into the build context.
+frontend/node_modules/
+frontend/node_modules/**
+frontend/dist/
+frontend/dist/**

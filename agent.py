@@ -1,6 +1,7 @@
 import os
 import asyncio
-from flask import Flask, request, jsonify, render_template, Response, stream_with_context
+from flask import (Flask, request, jsonify, render_template, Response,
+                   stream_with_context, send_from_directory, abort)
 from dotenv import load_dotenv
 
 # ADK and MCP Imports
@@ -23,7 +24,11 @@ STATIONS_TABLE = f"{PROJECT_ID}.{BQ_DATASET}.ev_charging_stations"
 USER = "default_user"
 APP_NAME = "EVChargeAIPlatform"
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
+
+# Built React (Vite) bundle lives in ./dist and is served from this same
+# Cloud Run service (single-service deploy → $0 idle, no CORS).
+DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dist')
 
 # --- Cost guardrails for the public demo --------------------------------------
 # Hard daily caps on the paid operations so abuse can never run up the bill.
@@ -31,7 +36,7 @@ app = Flask(__name__)
 import time as _time
 from collections import defaultdict
 
-DAILY_CAPS = {"chat": 600, "route": 500, "live": 150}  # per day, across all users
+DAILY_CAPS = {"chat": 600, "route": 500, "live": 50, "poi": 50}  # per day, across all users
 IP_PER_MIN = 12                                          # per-IP burst guard
 _rl = {"day": "", "global": defaultdict(int), "ip": defaultdict(list)}
 
@@ -281,9 +286,84 @@ def community_impact(country_code: str = "") -> dict:
     except Exception as e:
         return {"error": str(e)}
 
+
+def find_pois_near(latitude: float, longitude: float, poi_type: str = "restaurant",
+                   charge_minutes: int = 0) -> dict:
+    """Find walkable points of interest (restaurants, cafes, shopping, parking,
+    attractions) near a charging stop, so the driver can use the time while the car
+    charges — a 'smart life' suggestion, not just a charge. Combine the estimated
+    charge time with nearby POIs to propose a concrete plan.
+
+    Args:
+        latitude: The charging station latitude.
+        longitude: The charging station longitude.
+        poi_type: One of 'restaurant', 'cafe', 'shopping_mall', 'parking',
+            'tourist_attraction'.
+        charge_minutes: Estimated minutes the car will be charging. When > 0, only
+            POIs whose round-trip walk plus a short visit fit the window are kept.
+    """
+    real = _places_pois(latitude, longitude, poi_type)
+    pois = real if real is not None else _sim_pois(latitude, longitude, poi_type)
+    if charge_minutes and charge_minutes > 0:
+        fits = [p for p in pois if p["walk_min"] * 2 + 10 <= charge_minutes]
+    else:
+        fits = pois
+    return {"poi_type": poi_type, "charge_minutes": charge_minutes,
+            "count": len(fits or pois), "pois": fits or pois,
+            "source": "google_places" if real is not None else "simulated"}
+
+
+def plan_trip(stops: list) -> dict:
+    """Plan a multi-stop EV trip. `stops` is an ORDERED list of waypoints, each a
+    dict {name, latitude, longitude}. Computes each leg's driving distance/ETA
+    (Google Routes → OSRM fallback), totals them, and is the basis for suggesting
+    where to charge or where congestion may bite. Use for 'plan a trip from A to B
+    to C', road-trips, or shopping/dinner/parking multi-destination requests.
+
+    Args:
+        stops: Ordered waypoints [{name, latitude, longitude}, ...] (2 or more).
+    """
+    if not stops or len(stops) < 2:
+        return {"error": "need at least 2 stops"}
+    legs = []
+    for a, b in zip(stops, stops[1:]):
+        r = plan_route(a.get("latitude"), a.get("longitude"),
+                       b.get("latitude"), b.get("longitude"))
+        legs.append({"from": a.get("name"), "to": b.get("name"),
+                     "distance_km": r.get("distance_km"), "duration_min": r.get("duration_min"),
+                     "provider": r.get("provider")})
+    total_km = round(sum((l.get("distance_km") or 0) for l in legs), 1)
+    total_min = round(sum((l.get("duration_min") or 0) for l in legs))
+    return {"legs": legs, "total_km": total_km, "total_min": total_min, "stops": len(stops)}
+
 @app.route('/')
 def index():
+    """Serve the built React (Vite) app; fall back to the legacy template."""
+    if os.path.exists(os.path.join(DIST_DIR, 'index.html')):
+        return send_from_directory(DIST_DIR, 'index.html')
     return render_template('index.html')
+
+
+@app.route('/assets/<path:filename>')
+def dist_assets(filename):
+    """Vite hashed JS/CSS bundles."""
+    return send_from_directory(os.path.join(DIST_DIR, 'assets'), filename)
+
+
+@app.route('/<path:filename>')
+def dist_root(filename):
+    """SPA fallback for top-level files (favicon, vite.svg, client routes).
+    Never shadows API / chat / static — those are 404'd here and handled by
+    their own (more specific) registered routes first."""
+    if filename.startswith(('api/', 'chat', 'static/', 'assets/')):
+        abort(404)
+    full = os.path.join(DIST_DIR, filename)
+    if os.path.isfile(full):
+        return send_from_directory(DIST_DIR, filename)
+    # unknown path → SPA entry point
+    if os.path.exists(os.path.join(DIST_DIR, 'index.html')):
+        return send_from_directory(DIST_DIR, 'index.html')
+    abort(404)
 
 # Global variables for agent and runner
 agent = None
@@ -337,18 +417,21 @@ async def init_agent():
     all_tools.append(find_charging_deserts)
     all_tools.append(community_impact)
     all_tools.append(check_live_availability)
+    all_tools.append(find_pois_near)
+    all_tools.append(plan_trip)
 
-    # Configure the EV-Charge Agent (predictive charging decision intelligence)
+    # Configure the Smart-EV Agent (predictive charging + smart-life decision intelligence)
     agent = adk.Agent(
-        name="EV_Charge_Agent",
+        name="Smart_EV_Agent",
         model=MODEL,
-        description="Predictive EV charging agent for drivers and city stakeholders across APAC.",
+        description="Smart-EV copilot: charging, routing, trip planning and what-to-do-while-charging for drivers and city stakeholders across APAC.",
         tools=all_tools,
         instruction="""
-You are the EV-Charge Agent, an AI Decision Intelligence assistant that helps EV drivers and
-city stakeholders across the Asia-Pacific region make better charging decisions in everyday life.
-You combine real charging-station geodata (Open Charge Map, in BigQuery) with BigQuery ML demand
-forecasting and Gemini reasoning.
+You are the Smart-EV Agent, an AI Decision Intelligence copilot that helps EV drivers and
+city stakeholders across the Asia-Pacific region make better charging AND everyday-life decisions.
+You don't just find a plug — you plan the drive, simulate it, and suggest what to do while the car
+charges. You combine real charging-station geodata (Open Charge Map, in BigQuery) with BigQuery ML
+demand forecasting, Google Maps routing, nearby points of interest, and Gemini reasoning.
 
 TOOLS & WHEN TO USE THEM:
 1. find_nearby_stations(latitude, longitude, radius_km, min_power_kw):
@@ -365,7 +448,10 @@ TOOLS & WHEN TO USE THEM:
      falls back to a simulated estimate (the response's 'source' tells which).
 
 2. plan_route(from_latitude, from_longitude, to_latitude, to_longitude):
-   - After recommending a station, use this to give the real driving distance and ETA.
+   - ALWAYS call this for the SINGLE station you ultimately recommend, using that station's
+     coordinates as the destination — even if the user didn't explicitly ask for a route. The app
+     uses this call to draw the route on the map, animate the drive, and keep the on-screen plan
+     card in sync with YOUR recommendation. Then report the real driving distance and ETA.
 
 3. predict_charging_demand(zone_id, forecast_horizon):
    - Use when the user asks about congestion / busy times / demand outlook for an area.
@@ -384,6 +470,20 @@ TOOLS & WHEN TO USE THEM:
 6. check_charger_status / search_manual_embeddings:
    - For operator-style queries about a specific charger id (e.g. CHG-1004) or troubleshooting
      an error code, use these as before.
+
+7. find_pois_near(latitude, longitude, poi_type, charge_minutes):
+   - SMART-LIFE tool. When the user wants to use the charging time productively ("leave the car
+     charging and grab lunch", "what's near the charger", "coffee while I charge", "somewhere to
+     eat while it charges"), call this with the recommended station's coordinates, a poi_type
+     ('restaurant', 'cafe', 'shopping_mall', 'parking', 'tourist_attraction'), and the estimated
+     charge minutes. Estimate charge time from the car's battery and the station's kW.
+   - Then give a concrete plan, e.g. "~28 min charge — enough for lunch at <name>, a 4-min walk".
+
+8. plan_trip(stops):
+   - For multi-destination or road-trip requests ("shopping then dinner then parking", "trip from
+     A to B to C"), build the ordered list of {name, latitude, longitude} waypoints and call this.
+     Report per-leg ETA, the total distance/time, and suggest where to charge if the battery would
+     run low. Reason about congestion from the demand forecast where relevant.
 
 CAR-FIRST DECISIONS (this is an EV — reason about the specific vehicle):
 - The user message includes their EV model, connector type, battery %, and remaining range.
@@ -705,6 +805,105 @@ def api_live():
     return jsonify(sim_live_status(sid_i, total_i))
 
 
+_POI_LABELS = {
+    "restaurant": "Restaurant", "cafe": "Cafe", "shopping_mall": "Mall",
+    "parking": "Parking", "tourist_attraction": "Attraction",
+}
+
+
+def _sim_pois(lat, lon, poi_type="restaurant", limit=6):
+    """Deterministic simulated POIs near a point (free; no API call). Stable per
+    location/type, clearly surfaced as 'simulated'. Mirrors sim_live_status."""
+    label = _POI_LABELS.get(poi_type, "Place")
+    base = (abs(hash((round(lat, 3), round(lon, 3), poi_type))) % 1_000_000)
+    out = []
+    for i in range(limit):
+        h = (base * 2654435761 + i * 40503) & 0xFFFFFFFF
+        dlat = ((h % 1000) / 1000 - 0.5) * 0.009          # ~±500 m
+        dlon = (((h >> 10) % 1000) / 1000 - 0.5) * 0.009
+        dist_m = round(((dlat * 111000) ** 2 + (dlon * 90000) ** 2) ** 0.5)
+        out.append({
+            "name": f"{label} {chr(65 + i)}",
+            "type": poi_type, "lat": round(lat + dlat, 6), "lon": round(lon + dlon, 6),
+            "dist_m": dist_m, "walk_min": max(1, round(dist_m / 80)),
+            "rating": round(3.8 + (h % 12) / 10, 1), "source": "simulated",
+        })
+    out.sort(key=lambda p: p["dist_m"])
+    return out
+
+
+def _places_pois(lat, lon, poi_type="restaurant", radius_m=600, limit=6):
+    """Walkable POIs near a charging stop via Google Places (New) Nearby Search.
+    Returns a list of dicts, or None when unavailable (→ simulated fallback)."""
+    key = os.getenv("GOOGLE_MAPS_API_KEY")
+    if not key:
+        return None
+    import json as _json
+    import urllib.request
+    body = _json.dumps({
+        "includedTypes": [poi_type],
+        "maxResultCount": limit,
+        "locationRestriction": {"circle": {
+            "center": {"latitude": lat, "longitude": lon}, "radius": float(radius_m)}},
+    }).encode()
+    req = urllib.request.Request(
+        "https://places.googleapis.com/v1/places:searchNearby", data=body, method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": key,
+            "X-Goog-FieldMask": "places.displayName,places.location,places.rating,places.primaryType",
+        })
+    try:
+        with urllib.request.urlopen(req, timeout=12) as r:
+            data = _json.load(r)
+        places = data.get("places") or []
+        if not places:
+            return None
+        out = []
+        for p in places:
+            loc = p.get("location") or {}
+            plat, plon = loc.get("latitude"), loc.get("longitude")
+            if plat is None or plon is None:
+                continue
+            dist_m = round(haversine_m(lat, lon, plat, plon))
+            out.append({
+                "name": (p.get("displayName") or {}).get("text", "Place"),
+                "type": p.get("primaryType", poi_type), "lat": plat, "lon": plon,
+                "dist_m": dist_m, "walk_min": max(1, round(dist_m / 80)),
+                "rating": p.get("rating"), "source": "google_places",
+            })
+        out.sort(key=lambda x: x["dist_m"])
+        return out or None
+    except Exception:
+        return None
+
+
+def haversine_m(lat1, lon1, lat2, lon2):
+    from math import radians, sin, cos, asin, sqrt
+    dlat = radians(lat2 - lat1); dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    return 2 * 6371000 * asin(sqrt(a))
+
+
+@app.route('/api/poi')
+def api_poi():
+    """Walkable POIs near a charging stop: real (Google Places) if available,
+    else a simulated set. Rate-limited under the 'poi' daily cap."""
+    blocked, msg = rate_limited("poi")
+    if blocked:
+        return jsonify({"error": msg}), 429
+    try:
+        lat = float(request.args['lat']); lon = float(request.args['lon'])
+    except (KeyError, ValueError):
+        return jsonify({"error": "lat/lon required"}), 400
+    poi_type = request.args.get('type', 'restaurant')
+    real = _places_pois(lat, lon, poi_type)
+    pois = real if real is not None else _sim_pois(lat, lon, poi_type)
+    return jsonify({"type": poi_type, "count": len(pois),
+                    "source": "google_places" if real is not None else "simulated",
+                    "pois": pois})
+
+
 @app.route('/api/forecast')
 def api_forecast():
     """BQML ARIMA_PLUS demand forecast series for a zone (for the mini-chart)."""
@@ -851,7 +1050,29 @@ TOOL_LABELS = {
     "check_live_availability": "🟢 Checked live plug availability (Google Places / live)",
     "check_charger_status": "⚙️ Checked charger telemetry (BigQuery)",
     "search_manual_embeddings": "📖 Searched troubleshooting manuals (RAG)",
+    "find_pois_near": "🍴 Found things to do near the charger (Google Places)",
+    "plan_trip": "🗺️ Planned a multi-stop trip (Google Maps / OSM)",
 }
+
+
+def _safe_json(obj):
+    """Coerce a tool arg/result into a JSON-serializable structure (or {})."""
+    import json as _j
+    try:
+        return _j.loads(_j.dumps(obj, default=str))
+    except Exception:
+        return {}
+
+
+QUOTA_MSG = ("⚠️ The AI is briefly rate-limited right now (Gemini quota · error 429). "
+             "This is a temporary cloud limit — your data is fine. Please wait ~30 seconds and try again.")
+
+
+def _is_quota_error(e):
+    """True for Vertex/Gemini rate-limit (429) errors, so we surface an honest
+    'try again' message instead of the offline mock (which can look like real data)."""
+    s = str(e).upper()
+    return "RESOURCE_EXHAUSTED" in s or "429" in s or "QUOTA" in s
 
 
 def _stream_run_config():
@@ -890,48 +1111,72 @@ def chat_stream():
         asyncio.set_event_loop(loop)
 
         async def run():
-            seen_steps = set()
-            streamed_partial = False   # saw token deltas (streaming mode)
-            any_token = False
-            finals = []                # consolidated text (non-streaming fallback)
-            try:
-                # Fresh session per request → no cross-user context bleed, and the
-                # agent always reasons from scratch (consistent tool calls).
-                sess = await session_service.create_session(app_name=APP_NAME, user_id=USER)
-                rc = _stream_run_config()
-                kwargs = dict(new_message=content, user_id=USER, session_id=sess.id)
-                if rc is not None:
-                    kwargs["run_config"] = rc
-                async for event in runner.run_async(**kwargs):
-                    parts = getattr(getattr(event, 'content', None), 'parts', None)
-                    if not parts:
+            # Retry transient Vertex 429s with backoff — but ONLY while nothing has
+            # been emitted yet, so a mid-stream failure never duplicates output.
+            backoffs = [3, 6]   # waits before attempts 2 and 3
+            attempt = 0
+            while True:
+                seen_steps = set()
+                streamed_partial = False   # saw token deltas (streaming mode)
+                any_token = False
+                finals = []                # consolidated text (non-streaming fallback)
+                emitted = False            # any step/call/data/token sent this attempt
+                try:
+                    # Fresh session per request → no cross-user context bleed, and the
+                    # agent always reasons from scratch (consistent tool calls).
+                    sess = await session_service.create_session(app_name=APP_NAME, user_id=USER)
+                    rc = _stream_run_config()
+                    kwargs = dict(new_message=content, user_id=USER, session_id=sess.id)
+                    if rc is not None:
+                        kwargs["run_config"] = rc
+                    async for event in runner.run_async(**kwargs):
+                        parts = getattr(getattr(event, 'content', None), 'parts', None)
+                        if not parts:
+                            continue
+                        is_partial = bool(getattr(event, 'partial', False))
+                        for part in parts:
+                            fc = getattr(part, 'function_call', None)
+                            if fc and getattr(fc, 'name', None):
+                                if fc.name not in seen_steps:
+                                    seen_steps.add(fc.name)
+                                    q.put({"type": "step", "label": TOOL_LABELS.get(fc.name, f"🔧 {fc.name}")}); emitted = True
+                                try:
+                                    args = dict(fc.args) if getattr(fc, 'args', None) else {}
+                                except Exception:
+                                    args = {}
+                                # structured tool CALL (args reveal the agent's chosen coords)
+                                q.put({"type": "call", "tool": fc.name, "args": _safe_json(args)}); emitted = True
+                            fr = getattr(part, 'function_response', None)
+                            if fr and getattr(fr, 'name', None):
+                                # structured tool RESULT (stations / pois / route numbers)
+                                q.put({"type": "data", "tool": fr.name, "result": _safe_json(getattr(fr, 'response', None))}); emitted = True
+                            txt = getattr(part, 'text', None)
+                            if txt:
+                                if is_partial:
+                                    streamed_partial = True
+                                    any_token = True; emitted = True
+                                    q.put({"type": "token", "text": txt})   # delta
+                                else:
+                                    finals.append(txt)   # consolidated; emit only if no partials
+                    if not streamed_partial:
+                        full = "".join(finals).strip()
+                        if full:
+                            any_token = True; emitted = True
+                            q.put({"type": "token", "text": full})
+                    if not any_token:
+                        q.put({"type": "token", "text": local_agent_fallback(user_input)}); emitted = True
+                    break   # success
+                except Exception as e:
+                    print(f"[stream] agent error: {e}")
+                    if _is_quota_error(e) and not emitted and attempt < len(backoffs):
+                        wait = backoffs[attempt]; attempt += 1
+                        print(f"[stream] quota 429 — retrying in {wait}s (attempt {attempt + 1}/3)")
+                        await asyncio.sleep(wait)
                         continue
-                    is_partial = bool(getattr(event, 'partial', False))
-                    for part in parts:
-                        fc = getattr(part, 'function_call', None)
-                        if fc and getattr(fc, 'name', None) and fc.name not in seen_steps:
-                            seen_steps.add(fc.name)
-                            q.put({"type": "step", "label": TOOL_LABELS.get(fc.name, f"🔧 {fc.name}")})
-                        txt = getattr(part, 'text', None)
-                        if txt:
-                            if is_partial:
-                                streamed_partial = True
-                                any_token = True
-                                q.put({"type": "token", "text": txt})   # delta
-                            else:
-                                finals.append(txt)   # consolidated; emit only if no partials
-                if not streamed_partial:
-                    full = "".join(finals).strip()
-                    if full:
-                        any_token = True
-                        q.put({"type": "token", "text": full})
-                if not any_token:
-                    q.put({"type": "token", "text": local_agent_fallback(user_input)})
-            except Exception as e:
-                print(f"[stream] agent error: {e}")
-                q.put({"type": "token", "text": local_agent_fallback(user_input)})
-            finally:
-                q.put({"type": "done"})
+                    # 429/quota → honest retry message; other errors → offline fallback.
+                    q.put({"type": "token", "text": QUOTA_MSG if _is_quota_error(e) else local_agent_fallback(user_input)})
+                    break
+            q.put({"type": "done"})
 
         loop.run_until_complete(run())
         loop.close()
@@ -993,14 +1238,19 @@ def chat():
             return reply, steps
         except Exception as e:
             print(f"Error during agent loop: {e}. Falling back to local rules-based database querying.")
+            if _is_quota_error(e):
+                return QUOTA_MSG, []
             return local_agent_fallback(user_input), []
 
     try:
         reply, steps = asyncio.run(run_agent_loop())
         return jsonify({"agent_reply": reply, "agent_steps": steps})
     except Exception as e:
-        return jsonify({"agent_reply": local_agent_fallback(user_input), "agent_steps": []})
+        reply = QUOTA_MSG if _is_quota_error(e) else local_agent_fallback(user_input)
+        return jsonify({"agent_reply": reply, "agent_steps": []})
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
+    # Local default 8090 (8080 is often taken by other dev containers). Cloud Run
+    # always injects PORT (8080), so production is unaffected.
+    port = int(os.environ.get('PORT', 8090))
     app.run(host='0.0.0.0', port=port, debug=False)

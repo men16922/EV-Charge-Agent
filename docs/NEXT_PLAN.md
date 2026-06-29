@@ -1,6 +1,6 @@
 # Next Plan
 
-최종 갱신: 2026-06-27
+최종 갱신: 2026-06-28
 
 열린 작업(앞으로 할 일)만 유지하는 rolling plan. 완료 이력은 `docs/COMPLETED_SUMMARY.md`, 상세는 `docs/PROGRESS_LOG.md`.
 
@@ -8,9 +8,9 @@
 
 상세: `docs/submission/SUBMISSION_PLAN.md`. 제출 타입: blog + video 둘 다.
 
-- [x] 영상·블로그 **정본 스크립트** 작성 — `docs/submission/YOUTUBE_SCRIPT_FINAL.md`(VO만 영어, 나머지 한글) + `BLOG_FINAL.md`(github.io/Medium용).
 - [ ] [오늘] LinkedIn **티저(영상만, 링크 없음)** 게시 — `docs/submission/teaser.mp4` + `LINKEDIN_TEASER.md` 캡션.
-- [ ] [7월] **풀 데모 영상** 촬영·편집 → YouTube(unlisted→검수→public). 스크립트 `YOUTUBE_SCRIPT_FINAL.md`.
+- [x] 유튜브 풀 데모 영상 최종 편집 및 자막 번인 완료 — [youtube_final.mp4](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/docs/submission/youtube_final.mp4)
+- [ ] [7월] **풀 데모 영상** YouTube 업로드 및 아티클 **dev.to**(정본) 발행.
 - [ ] [7월] 아티클 **men16922.github.io**(정본) 발행 → canonical 설정 → **Medium** `@men16922` 교차게시(`canonical_url`). 정본 `BLOG_FINAL.md`.
 - [ ] [7월] 두 파일 자리표시자 채우기: `<github-url>`/`<youtube-url>`/`<blog-url>`/blog canonical.
 - [ ] [선택] 유튜브 화면텍스트(하단자막·엔드카드·제목) 영문 통일 여부 결정(국제 심사 일관성).

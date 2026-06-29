@@ -2,6 +2,11 @@
 
 되돌리기 어려운 선택(provider/infra/데이터 모델/문서 정책/public workflow)을 기록한다.
 
+## 2026-06-28 — Pillow 기반 비디오 프레임별 자막 렌더링 파이프라인 구축
+- **Decision**: FFmpeg 필터(`subtitles`, `drawtext`) 대신 **Python (Pillow)을 사용한 프레임별 다이렉트 자막 드로잉 및 파이프라인**을 설계하여 비디오를 렌더링 및 편집.
+- **Reason**: 로컬 개발 환경의 FFmpeg 빌드가 `--enable-libass` 및 `--enable-libfreetype` 옵션 없이 컴파일되어 `subtitles`와 `drawtext` 필터를 지원하지 않음(No such filter 에러).
+- **Impact**: 외부 라이브러리 의존성 없이 로컬의 가용 폰트(Arial/AppleGothic)를 활용하여 정교한 영문 VO 캡션 및 하단 안내 라벨(Cyan)을 다중 번인 처리함. CPU 기반의 파이핑으로 인해 다소 인코딩 시간이 소요되나 2분 영상 기준 약 1분 내외로 정상 처리됨.
+
 ## 2026-06-27 — 제품 피벗: "Predictive Charging Copilot" (Open Charge Map APAC)
 - **Decision**: 운영자용 목업 6대 컨셉 → **시민/도시 대상 예측 충전 의사결정 에이전트**로 피벗. 데이터는 **Open Charge Map**(전세계/APAC, 무료)을 채택해 13개국 7,842개 실충전소를 BigQuery `ev_charging_stations`(GEOGRAPHY)에 적재. NREL(미국 전용)은 APAC 부적합으로 미채택.
 - **Reason**: 해커톤 주제("AI for Better Living and Smarter Communities")는 시민·커뮤니티·예측을 강조. APAC 심사 → 전세계 커버리지 필요. OCM이 무료+APAC 포함으로 최적.

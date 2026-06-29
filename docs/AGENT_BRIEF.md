@@ -4,7 +4,7 @@
 
 이 파일은 EV-Charge EV AI Agent 플랫폼 프로젝트 시작용 압축 문맥이다(≤60줄).
 
-> ▶ NEXT SESSION: 영상·블로그 **정본 스크립트 완료**(`docs/submission/YOUTUBE_SCRIPT_FINAL.md`·`BLOG_FINAL.md`). 다음 액션 = LinkedIn 티저(영상만) 게시 → 7월 발행(YouTube 촬영 + github.io→Medium 아티클, 자리표시자 URL 채우기). 공개 전 예산알림·Maps 일일쿼터 권장. 상세 `docs/NEXT_PLAN.md`.
+> ▶ NEXT SESSION: 유튜브 최종 데모 영상 편집 완료(docs/submission/youtube_final.mp4). 다음은 dev.to 아티클 초안 검토 및 YouTube 업로드 준비. 상세 `docs/NEXT_PLAN.md`, 제출 `docs/submission/SUBMISSION_PLAN.md`.
 
 ## Active Work
 

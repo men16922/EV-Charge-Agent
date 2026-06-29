@@ -1,9 +1,23 @@
 # Progress Log
 
-최종 갱신: 2026-06-27
+최종 갱신: 2026-06-28
 
 이 파일은 **최신 증분 요약만** 유지한다(최신 3-5항목, ≤120줄). 오래된 항목은
 `docs/archive/progress-YYYY-MM.md`로 이관한다(`/tidy-docs`).
+
+## 2026-06-28 — YouTube Demo Video Editing & English Caption Integration
+- **Status**: Completed.
+- **Changed**:
+  - Compiled [youtube_final.mp4](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/docs/submission/youtube_final.mp4) (1080p, 16:9, 30fps) by stitching 7 scenes from [docs/builder](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/docs/builder).
+  - Translated all Korean bottom label ticker text to English for international judges.
+  - Developed custom frame-by-frame drawing pipeline in Python using Pillow to inject dual English subtitles (voiceover narration captions + bottom labels) directly, bypassing local FFmpeg builds that lack `drawtext` and `subtitles` filters.
+  - Dynamically speed-adjusted video tracks to align perfectly with voiceover durations.
+  - Fixed BrokenPipeError issues and forced consistent frame rate (30fps) across scenes for seamless concatenation.
+- **Verified**:
+  - Extracted sample frames from [youtube_final.mp4](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/docs/submission/youtube_final.mp4) and verified dual English subtitles render correctly with proper wrapping.
+  - Confirmed final video parameters (H.264 video, AAC audio, 2m 2s duration, 44MB size).
+- **Blockers**: None.
+- **Next**: Upload full demo video to YouTube, write/publish dev.to article, submit files for Meet the Builders.
 
 ## 2026-06-28 — Submission Final Scripts (YouTube + Blog)
 - **Status**: Completed. Meet the Builders 제출용 영상·블로그 정본 작성. 발행 자리표시자(URL)만 남음.
