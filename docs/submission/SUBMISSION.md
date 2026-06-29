@@ -1,7 +1,8 @@
 # Smart-EV Agent — 해커톤 프로토타입 제출
 
 > Gen AI Academy APAC Edition · **Hackathon Prototype Submission**
-> 제출 기간: 2026-06-29 19:31 IST → **2026-07-07 03:29 IST** (약 7일). 모든 링크는 공개 접근 가능해야 함.
+> 제출 기간: 2026-06-29 19:31 IST → **2026-07-07 03:29 IST**. 모든 링크는 공개 접근 가능해야 함.
+> 🎯 **목표 제출일: ~2026-07-04 (토)** — 마감 여유 두고 제출.
 
 ---
 
@@ -12,7 +13,7 @@
 | **Challenge** | ⚠️ *포털에서 선택.* 적합: AI 에이전트 / 지속가능·스마트시티 on Google Cloud. |
 | **Project Deployment Link** | `https://ev-charge-web-1004528040791.us-central1.run.app` — ✅ **새 React 앱 배포 완료** (rev 00004-265, 2026-06-29). 실제 Places 데이터 포함. |
 | **Project PPT (PDF ≤5MB)** | ⬜ 템플릿 채우고 PDF로 내보내기. 슬라이드 내용은 §3. |
-| **GitHub Repository Link** | `https://github.com/men16922/EV-Charge-Agent` — ⚠️ **현재 작업 푸시** + repo **public** 전환 (원격엔 초기 커밋만). |
+| **GitHub Repository Link** | `https://github.com/men16922/EV-Charge-Agent` — ✅ **public · 푸시 완료** (제출용 README 갱신됨). |
 | **Demo Video Link (≤3분)** | ⬜ `docs/submission/youtube_final.mp4`(2:02) 업로드. ⚠️ **신기능으로 재촬영** (현재 컷은 옛 UI). |
 | **Brief Description (≤1024자)** | ✅ 완성 — §2 그대로 붙여넣기. |
 
@@ -87,8 +88,8 @@ Google can't route (automatic OSRM fallback).
 ## 4) 제출 전 체크리스트 (이 순서대로)
 
 - [x] **Cloud Run 새 React 빌드 재배포** — 완료(rev 00004-265). 라이브 URL이 새 Smart-EV 앱 서빙, Places 실데이터·0 에러 검증됨.
-- [ ] **비용 가드(Places 유료 ON):** GCP **예산 알림 $20** + **Maps 일일 쿼터** 설정. 앱 캡은 이미 poi/live 50/일. (또는 `make places-off`로 $0 데모.)
-- [ ] **GitHub public + 푸시:** `.env` ignore 유지(확인됨 ✓), 작업 커밋·푸시, repo **public** 전환. README에 라이브 URL + 실행법.
+- [x] **GitHub public + 푸시:** `.env` ignore 유지(확인됨 ✓), 작업 커밋·푸시, repo **public**. 제출용 README(라이브 URL + 실행법) 갱신됨.
+- [x] **비용 가드:** GCP 예산 알림 $20 + Places 일일 쿼터(SearchNearby/Text 500/일) 설정 완료. 앱 캡 poi/live 50/일.
 - [ ] **데모 영상(≤3분):** 현재 `youtube_final.mp4`는 옛 UI — 추천 → drive+charge 시뮬 → POI → trip → 예보 카드 순으로 재촬영. 업로드(비공개 → 검수 → 공개).
 - [ ] **PPT → PDF(≤5MB):** §3 + 스크린샷 + 아키텍처 이미지로 템플릿 채우고 PDF 내보내기.
 - [ ] **Challenge 옵션 선택.**

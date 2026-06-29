@@ -1,12 +1,16 @@
-# ⚡ Smart-EV Agent — your autonomous EV copilot for APAC
+# ⚡ Smart-EV Agent
 
-> **Charge, drive & live smarter.** An AI decision-intelligence copilot that doesn't
-> just find a plug — it plans the drive, simulates it, and tells you what to do while
-> you charge. Built end-to-end on Google Cloud.
+### Your autonomous EV copilot for APAC — charge, drive & live smarter
 
-🔗 **Live demo:** https://ev-charge-web-1004528040791.us-central1.run.app
-📦 **Repo:** https://github.com/men16922/EV-Charge-Agent
-🧰 **Stack:** Gemini 2.5 Flash · Vertex AI ADK · BigQuery + BigQuery ML · Cloud Run · Google Maps (Routes/Places)
+An AI decision-intelligence copilot that doesn't just find a plug — it plans the drive,
+**simulates it on the map**, and tells you what to do while you charge. Built end-to-end
+on Google Cloud.
+
+|   |   |
+| --- | --- |
+| 🔗 **Live demo** | https://ev-charge-web-1004528040791.us-central1.run.app |
+| 📦 **Repository** | https://github.com/men16922/EV-Charge-Agent |
+| 🧰 **Stack** | Gemini 2.5 Flash · Vertex AI ADK · BigQuery + BigQuery ML · Cloud Run · Google Maps (Routes/Places) · React + Vite |
 
 ---
 
