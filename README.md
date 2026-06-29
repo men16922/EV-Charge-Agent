@@ -110,4 +110,4 @@ gcloud run deploy ev-charge-web \
 - `frontend/` — React + Vite + Leaflet UI (drive/charge simulation, plan/forecast cards, tabs).
 - `Dockerfile.web` / `cloudbuild.web.yaml` — multi-stage build + Cloud Run deploy.
 - `Makefile` — `make check` (gate), `make places-on/off` (cost toggle).
-- `docs/submission/SUBMISSION.md` — hackathon submission checklist & deck content.
+- `scripts/` — data pipeline (`ingest_ocm_apac.py`, `ocm_schema.json`, `build_bqml_forecast.sql`).

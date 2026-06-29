@@ -51,6 +51,16 @@ frontend/dist/
 .claude/settings.local.json
 _workspace/
 
+# Internal workflow / overnight-harness / agent tooling — keep LOCAL, not in the public repo
+docs/
+scripts/overnight/
+.claude/
+.codex/
+.serena/
+MASTER_PLAN.md
+INSTRUCTION.md
+GEMINI.md
+
 # Generated data exports
 scripts/_ocm_apac.ndjson
 
