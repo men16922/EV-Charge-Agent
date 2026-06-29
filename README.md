@@ -1,65 +1,109 @@
-# EV-Charge: Smart EV Charging Platform with AI Decision Agent
+# ⚡ Smart-EV Agent — your autonomous EV copilot for APAC
 
-**EV-Charge** is a smart city EV charging infrastructure demand forecasting, routing, and troubleshooting decision platform. It integrates real-time telemetry, semantic manual search, and time-series demand forecasting using Google Cloud (AlloyDB, BigQuery ML) and Google ADK (Agent Development Kit).
+> **Charge, drive & live smarter.** An AI decision-intelligence copilot that doesn't
+> just find a plug — it plans the drive, simulates it, and tells you what to do while
+> you charge. Built end-to-end on Google Cloud.
+
+🔗 **Live demo:** https://ev-charge-web-1004528040791.us-central1.run.app
+📦 **Repo:** https://github.com/men16922/EV-Charge-Agent
+🧰 **Stack:** Gemini 2.5 Flash · Vertex AI ADK · BigQuery + BigQuery ML · Cloud Run · Google Maps (Routes/Places)
 
 ---
 
-## 🚀 Instant Local Run (Run-ability in 1-Click)
+## What it is
 
-To run and evaluate the platform locally in a 100% offline, free sandbox environment:
+EV drivers across the Asia-Pacific region face more than range anxiety: *will the plug
+fit my car, be free when I arrive, and be worth the trip?* **Smart-EV Agent** is a
+Gemini-powered agent + React dashboard that answers all of that — and turns "where do I
+charge?" into a full smart-life plan: **best charger → drive → charge → what to do
+meanwhile** — every recommendation explained, and the whole journey simulated on the map.
 
-### Prerequisites
-*   Docker & Docker Compose
-*   Python 3.10+
+It runs on **7,842 real charging stations** (Open Charge Map, APAC) stored as BigQuery
+`GEOGRAPHY`, with BigQuery ML (ARIMA_PLUS) demand forecasting and live availability.
 
-### Step 1: Spin up Vector DB, Ingest Data & Run Verification
-Run the following commands to start the PostgreSQL+pgvector database, load raw NREL fuel stations & technical manual embeddings, and execute syntax checking & offline evaluations:
+## Key features
+
+- 🔌 **Connector-aware recommendation** — ranks chargers by distance, power (kW), live
+  availability, your car's connector, and reachability on current battery; explains *why*.
+- 🚗 **Autonomous drive simulation** — the car drives the route on the map (inline HUD)
+  or in a cinematic modal, with **TURBO 1×/4×/16×**. Hybrid routing: Google Routes →
+  **OSRM fallback** for regions Google can't route (e.g. Korea).
+- 🔋 **Charging simulation** — battery animates to target, with kW + minutes, synced to
+  the EV panel (battery curve / taper modeled).
+- 🍴 **Smart-life POIs** — "leave the car charging and grab lunch": walkable restaurants/
+  cafes/shopping near the stop (Google Places), fitted to the charge window.
+- 🗺️ **Multi-stop trip planning** — shopping → dinner → parking, with per-leg ETA + totals.
+- 🌍 **Equity & impact** — charging-desert overlay for underserved areas, community CO₂
+  avoided, BigQuery ML demand-forecast cards.
+- 🤖 **Explainable & live** — streaming agent reasoning trace, structured plan/forecast
+  UI cards reconstructed from tool results, bilingual **EN/KO**.
+
+## Architecture
+
+```
+React + Vite (Leaflet)  ──┐
+                          ├─►  Flask on Cloud Run (single service, scale-to-zero, $0 idle)
+   /api/* · /chat/stream ─┘            │
+                                       ├─►  Vertex AI · Gemini 2.5 Flash + ADK (agent, 10 tools)
+                                       ├─►  BigQuery — ev_charging_stations (GEOGRAPHY) + ARIMA_PLUS
+                                       ├─►  Google Maps — Routes (→ OSRM fallback) · Places (New)
+                                       └─►  MCP toolbox (status / manuals / forecast)
+```
+The Vite frontend is built inside `Dockerfile.web` (multi-stage: Node build → Python
+runtime) and served by Flask from the **same** Cloud Run service — no CORS, one deploy.
+
+## Agent tools (10)
+
+| Tool | Source | Purpose |
+| --- | --- | --- |
+| `find_nearby_stations` | BigQuery (geospatial) | nearest compatible chargers + live status |
+| `plan_route` | Google Routes → OSRM | driving distance & ETA |
+| `find_pois_near` | Google Places (New) | walkable things to do while charging |
+| `plan_trip` | chained routing | multi-stop trip ETAs & totals |
+| `find_charging_deserts` | BigQuery (geospatial) | coverage gaps / equity |
+| `community_impact` | BigQuery | public-access share, CO₂ avoided |
+| `check_live_availability` | Google Places / sim | is this station free now |
+| `check_charger_status` · `search_manual_embeddings` · `predict_charging_demand` | MCP toolbox | telemetry · RAG manuals · ARIMA_PLUS forecast |
+
+## Run it locally
+
+**Prerequisites:** Python 3.10+, Node 18+, and Google Cloud ADC for live data
+(`gcloud auth application-default login`; BigQuery + Vertex AI access).
+
 ```bash
-# Start local pgvector container
-docker-compose up -d
+# 1) Build the React frontend (served by Flask from ../dist)
+cd frontend && npm install && npm run build && cd ..
 
-# Ingest NREL data and technical troubleshooting steps locally
-python3 scripts/load_data_local.py
+# 2) Run the app (serves the built UI + APIs + streaming agent)
+python3 agent.py            # → http://localhost:8090
 
-# Verify compilation and run evaluation tests
+# Offline checks (compilation + agent evaluation, no cost)
 make check
 ```
 
-### Step 2: Start the Web Dashboard & Agent
-Start the Flask web backend using the mock local MCP server:
+**Frontend dev mode (hot reload):** run `python3 agent.py` (8090) in one terminal and
+`cd frontend && npm run dev` (5173) in another — Vite proxies `/api` and `/chat` to Flask.
+
+## Deploy (Cloud Run, single service, ~$0 idle)
+
 ```bash
-python3 agent.py
+gcloud builds submit --config cloudbuild.web.yaml      # build + push image
+gcloud run deploy ev-charge-web \
+  --image gcr.io/$PROJECT_ID/ev-charge-web:latest \
+  --region us-central1 --max-instances 1 --allow-unauthenticated
 ```
-Open **`http://localhost:8080`** in your browser to interact with the premium operator dashboard.
 
----
+## Cost & safety
 
-## 🛠️ Project Structure
+- **$0 idle:** Cloud Run scales to zero; `--max-instances 1` bounds spend.
+- **Hard app caps:** paid endpoints rate-limited (chat/route + Places `poi`/`live` 50/day).
+- **Places toggle:** `make places-on` (real POIs, paid) / `make places-off` (simulated, free).
+- **Backstops:** GCP budget alert + Maps daily quota; honest 429 handling + retry/backoff.
 
-*   **[`agent.py`](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/agent.py)**: Core Flask application. Initialises the Google ADK Agent, session runner, and routes user questions to database tools.
-*   **[`agent_eval.py`](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/agent_eval.py)**: Offline/Online evaluation suite. Assesses Agent tool routing accuracy and groundedness (hallucination defense) using the Vertex Gen AI Evaluation Service.
-*   **[`mcp_server_local.py`](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/mcp_server_local.py)**: FastMCP server providing simulated tools for offline testing without hitting GCP costs.
-*   **[`tools.yaml`](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/tools.yaml)**: Database Toolbox configuration defining SQL statements for AlloyDB and BigQuery.
-*   **[`docker-compose.yml`](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/docker-compose.yml)**: Local postgres database container configured with `pgvector` extension.
-*   **[`scripts/ingest_data.sh`](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/scripts/ingest_data.sh)**: Automated shell script to download NREL Alternative Fuel Stations dataset, upload to GCS (Bronze), and load into BigQuery with auto schema detection (Silver/Gold).
-*   **[`scripts/load_data_local.py`](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/scripts/load_data_local.py)**: Local Python script that downloads NREL dataset and loads it along with troubleshooting manual embeddings directly into the local `pgvector` container ($0 cost).
-*   **[`MASTER_PLAN.md`](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/MASTER_PLAN.md)**: Full architecture design, data strategy (Zero-ETL Federation, external datasets), safety compliance, and cost minimization guidelines.
-*   **[`QA_TEST.md`](file:///Users/men1692/Desktop/GCP/APAC_HACKATHON/QA_TEST.md)**: Step-by-step test guide to verify charger status, troubleshooting manuals, and ARIMA_PLUS forecasting locally.
+## Project layout
 
----
-
-## 📊 Evaluation Scorecard
-
-Running `make check` evaluates the agent against test sets. The output includes routing precision and groundedness metrics:
-
-*   **Routing exact_match**: Confirms requests map correctly to tools and parameters (e.g. `check_charger_status` for ID `CHG-1004`).
-*   **Groundedness score**: Validates that agent responses are strictly grounded in retrieved database context and successfully flags/defends against hallucinations and prompt injection.
-
----
-
-## 🛡️ Cost & Safety Architecture
-For production environments, the platform incorporates:
-1.  **Scale-to-Zero Auto-scaling**: Cloud Run container scales down to 0 instances when idle.
-2.  **AlloyDB Start/Stop Scheduler**: Shuts down transactional databases in non-testing windows.
-3.  **Human-in-the-Loop Safety Gate**: Pending action states written to Firestore to require SRE operator authorization.
-4.  **Zero-ETL Lakehouse Federation**: Unifies AlloyDB live status and BigQuery analytical forecasts without data replication pipeline costs.
+- `agent.py` — Flask app: agent (ADK/Gemini), 10 tools, JSON APIs, SSE chat, serves `dist/`.
+- `frontend/` — React + Vite + Leaflet UI (drive/charge simulation, plan/forecast cards, tabs).
+- `Dockerfile.web` / `cloudbuild.web.yaml` — multi-stage build + Cloud Run deploy.
+- `Makefile` — `make check` (gate), `make places-on/off` (cost toggle).
+- `docs/submission/SUBMISSION.md` — hackathon submission checklist & deck content.
