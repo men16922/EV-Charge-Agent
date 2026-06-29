@@ -82,7 +82,8 @@ cd frontend && npm install && npm run build && cd ..
 python3 agent.py            # → http://localhost:8090
 
 # Offline checks (compilation + agent evaluation, no cost)
-make check
+python3 -m py_compile agent.py agent_eval.py mcp_server_local.py
+python3 agent_eval.py
 ```
 
 **Frontend dev mode (hot reload):** run `python3 agent.py` (8090) in one terminal and
@@ -101,7 +102,7 @@ gcloud run deploy ev-charge-web \
 
 - **$0 idle:** Cloud Run scales to zero; `--max-instances 1` bounds spend.
 - **Hard app caps:** paid endpoints rate-limited (chat/route + Places `poi`/`live` 50/day).
-- **Places toggle:** `make places-on` (real POIs, paid) / `make places-off` (simulated, free).
+- **Places toggle:** enable `places.googleapis.com` for real POIs (paid) or leave it disabled to fall back to simulated POIs (free).
 - **Backstops:** GCP budget alert + Maps daily quota; honest 429 handling + retry/backoff.
 
 ## Project layout
@@ -109,5 +110,4 @@ gcloud run deploy ev-charge-web \
 - `agent.py` — Flask app: agent (ADK/Gemini), 10 tools, JSON APIs, SSE chat, serves `dist/`.
 - `frontend/` — React + Vite + Leaflet UI (drive/charge simulation, plan/forecast cards, tabs).
 - `Dockerfile.web` / `cloudbuild.web.yaml` — multi-stage build + Cloud Run deploy.
-- `Makefile` — `make check` (gate), `make places-on/off` (cost toggle).
-- `scripts/` — data pipeline (`ingest_ocm_apac.py`, `ocm_schema.json`, `build_bqml_forecast.sql`).
+- `scripts/` — data pipeline (`ingest_ocm_apac.py`, `ocm_schema.json`, `build_bqml_forecast.sql`) + `deploy.sh`.
