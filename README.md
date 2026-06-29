@@ -44,15 +44,14 @@ It runs on **7,842 real charging stations** (Open Charge Map, APAC) stored as Bi
 
 ## Architecture
 
-```
-React + Vite (Leaflet)  ──┐
-                          ├─►  Flask on Cloud Run (single service, scale-to-zero, $0 idle)
-   /api/* · /chat/stream ─┘            │
-                                       ├─►  Vertex AI · Gemini 2.5 Flash + ADK (agent, 10 tools)
-                                       ├─►  BigQuery — ev_charging_stations (GEOGRAPHY) + ARIMA_PLUS
-                                       ├─►  Google Maps — Routes (→ OSRM fallback) · Places (New)
-                                       └─►  MCP toolbox (status / manuals / forecast)
-```
+![Smart-EV Agent architecture](assets/architecture.png)
+
+**Browser UX** (React + Vite + Leaflet) → **Cloud Run** (Flask app + API gateway, SSE
+streaming, rate limits, scale-to-zero) → **Gemini Agent** (Vertex AI · Gemini 2.5 Flash ·
+Google ADK) → **deterministic tool layer** (nearby search, demand forecast, route planner,
+live status, city insights) backed by **BigQuery** (7,842 APAC stations as `GEOGRAPHY`,
+ARIMA_PLUS forecast), **hybrid routing** (Google Routes → OSRM fallback), and a status adapter.
+
 The Vite frontend is built inside `Dockerfile.web` (multi-stage: Node build → Python
 runtime) and served by Flask from the **same** Cloud Run service — no CORS, one deploy.
 
